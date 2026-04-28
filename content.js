@@ -1941,10 +1941,7 @@ function registerEarlyReplyOpportunity(container, opportunity) {
   // Update sidebar
   updateSidebar();
   
-  // Show browser notification if sidebar is closed
-  if (!sidebarVisible && opportunity.urgency === 'high') {
-    showBrowserNotification(opportunity.message, tweetText.substring(0, 50));
-  }
+  // Browser notifications disabled to avoid OS popups.
 }
 
 // Create sidebar component
@@ -2210,23 +2207,6 @@ function scrollToTweet(container, tweetId) {
   setTimeout(() => {
     container.style.boxShadow = '';
   }, 2000);
-}
-
-// Show browser notification
-function showBrowserNotification(title, body) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, {
-      body: body,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23667eea"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-      tag: 'tonegenie-early-reply'
-    });
-  } else if ('Notification' in window && Notification.permission !== 'denied') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        showBrowserNotification(title, body);
-      }
-    });
-  }
 }
 
 // ==================== HIGH VALUE ACCOUNT FINDER ====================
