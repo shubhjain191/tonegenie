@@ -1,0 +1,49 @@
+{
+  "handle": "@gregisenberg",
+  "displayName": "Greg Isenberg",
+  "platform": "x",
+  "niche": "community building, startup ideas, product strategy",
+  "tone": "idea-focused, practical, community-first, energetic",
+  "avgPostLength": 198,
+  "avoids": [
+    "vague generalities"
+  ],
+  "signaturePatterns": [
+    "Specific startup/business ideas",
+    "Community building frameworks"
+  ],
+  "hookTypes": [
+    "Specific business idea",
+    "Underrated opportunity"
+  ],
+  "category": "build-in-public",
+  "examples": [
+    "what's about to happen: &gt; saas stocks see a massive correction &gt; pressure to boost profits &gt; saas companies see BIG productivity gains from AI &gt; saas companies lay OFF 100,000+ workers in 2026 :( &gt; hiring slows down &gt; laid off workers can't find jobs &gt; many become founders out",
+    "be 11 year old founder rishan dutia from texas: &gt;teachers are burning out &gt;schools can’t hire fast enough &gt;rishan wants to help his teachers &gt;he teams up with a 19-year-old &gt;built an AI classroom assistant that gives teachers 10 &gt;hours back every week &gt;runs lessons in 32",
+    "how to use firecrawl to give your AI eyes and actually build startups that outperform 99% of apps: 1. your AI is smart but blind. it can't go to a website, read a page, or grab data on its own. firecrawl fixes that. you put in a URL. you get back clean markdown, structured JSON,",
+    "how to use claude code, railway, meta etc to spin up digital employees that run your marketing 24/7 1. create one folder. drop in an environment file with every api key you use (facebook ads, instantly, phantom buster, perplexity, ga4, slack, notion). start thinking in apis (new",
+    "how to use claude code + outscraper + crawl4ai to build a profitable online directory in 4 days for under $250 1. scrape 50k–70k raw records with outscraper 2. use claude code to clean, dedupe, and structure the data in passes 3. run crawl4ai to verify live sites and filter junk",
+    "I wanted to make a 1 hour guide that shows how $30k-$300k MRR SaaS businesses with tactics like AI search to waitlist strategy and give away the 6 SaaS frameworks they use. The more founders I meet, the more I see the same thing: people can vibe code beautiful products, but they",
+    "i reverse engineered 8 apps that hit $50K MRR in under 180 days and explain the pattern behind all of them 1/ find a group that spends money 2/ find a problem they repeat weekly 3/ use AI to make it work with photos/videos/inputs 4/ make the output dead-accurate 5/ replace their",
+    "how to build an ai native vertical saas in the claude cowork era: 1. pick a sub-niche inside a large, profitable market 2. map one recurring workflow that drives revenue or saves time 3. write the workflow step-by-step like you’re training an intern 4. separate mechanical steps",
+    "the future of building saas this is how 3-person teams build 100m companies: 1/ start with a sub-niche inside a big market 2/ map their daily workflow end-to-end 3/ identify where money changes hands 4/ spot the repetitive mechanical steps 5/ quantify the cost of those steps 6/",
+    "Bill Gurley (@bgurley) CLEARLY outlines his AI thesis in 14 minutes to Tim Ferriss (@tferriss) 1. Every real tech shift that creates wealth also attracts speculation, and the two usually show up together 2. AI looks like an industrial wave where real companies and workflows get",
+    "it still blows my mind you can open a podcast app today and listen to satya from microsoft, jensen from nvidia, brian chesky from airbnb, tobi from shopify, and the indie builders making $100k MRR. they tell you exactly how they build their products, the mistakes they made, and",
+    "I don’t know who needs to hear this, but 99% of the money VCs invest isn’t theirs. General partners usually commit 1–2% of a fund and the other 98-99% comes from pension funds, endowments, HNWs and institutions spread across ~30+ bets per fund. Their model works if 10% of those",
+    "how to use obsidian + claude code to build a 24/7 personal operating system and build your startup: 1. write everything in markdown (daily notes, projects, beliefs, people, meetings) 2. link your notes together so they mirror how your brain actually thinks. 3. install obsidian",
+    "how to make your ai app not look like it was made with ai (weavy ai, claude, figma etc) use weavy ai to generate custom assets, color systems, and logos across models like flux + ideogram, then compose it properly in figma then paste into claude code/google ai studio etc watch",
+    "this was one of the biggest weeks in AI because claude opus 4.6 and gpt-5.3 codex dropped basically at the SAME time. they solve the same problem in VERY different ways. - opus spins up agent teams and disappears for a while. - codex stays with you and ships ridiculously fast.",
+    "THE FUTURE OF EDUCATION: if i was 18 right now, I would only drop $200k to go to college if i NEEDED a credential at the end (doctor, lawyer etc), because there is alternative path that lets you learn 10x faster. you live inside claude code, you plug in openclaw so your agents",
+    "ive been hanging out with founders under 22 lately living in sf/nyc and they're built different. my observations of these young founders getting rich with AI: 1. these kids grew up watching YT creators flexing Porsches and private jets from their bedrooms. but when they looked",
+    "HOW TO BUILD A BIG CONSUMER B2C MOBILE APP IN 2026 1. start with a single recurring behavior people already document, like meals, sleep, workouts, studying, dating, or routines. 2. anchor the app to one question users already ask themselves daily, like “am I doing this right?”",
+    "OpenAI just launched \"agent skills\", their version of what Claude calls skills. It finally clicked to me how these agents, skills and MCPs will work together. Basically, a skill is just the recipe for how something should be done, subagents are extra hands you spin up when the",
+    "This feels directionally right. An agency comes in for a few weeks, maps how work actually flows, and installs claude skills/agents that handle reporting, follow-ups, checks, and coordination. That replaces work spread across a few roles that might cost $250k–$400k a year. The"
+  ],
+  "_meta": {
+    "scraped_at": "2026-03-28T23:07:33.459442",
+    "scraper_used": "twikit_auth",
+    "total_scraped": 301,
+    "valid_kept": 234,
+    "examples_used": 20
+  }
+}

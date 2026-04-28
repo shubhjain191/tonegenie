@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "tonegenie",
+    "version": "1.0",
+    "description": "Generate smart, contextual comments for social media posts",
+    "permissions": [
+      "activeTab",
+      "storage"
+    ],
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "content_scripts": [
+      {
+        "matches": ["https://twitter.com/*", "https://x.com/*"],
+        "js": ["content.js"],
+        "css": ["styles.css"]
+      }
+    ],
+    "background": {
+      "service_worker": "background.js"
+    }
+  }

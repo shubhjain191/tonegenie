@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 380px;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 0;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px 12px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      transition: all 0.2s;
+      margin-bottom: -2px;
+    }
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+    .tab:hover {
+      color: #667eea;
+      background: rgba(102, 126, 234, 0.05);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    h2 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+      color: #1a1a1a;
+      text-align: center;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    .emoji {
+      font-size: 32px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .input-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .api-note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+    .api-note a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .api-note a:hover {
+      text-decoration: underline;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #5568d3;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .btn-small {
+      width: auto;
+      padding: 6px 12px;
+      font-size: 12px;
+      margin: 4px;
+    }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      text-align: center;
+      display: none;
+      font-weight: 500;
+    }
+    .status.success {
+      background: #d1fae5;
+      color: #065f46;
+      display: block;
+    }
+    .status.error {
+      background: #fee2e2;
+      color: #991b1b;
+      display: block;
+    }
+    .divider {
+      height: 1px;
+      background: #e5e7eb;
+      margin: 20px 0;
+    }
+    .how-it-works {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #374151;
+    }
+    .how-it-works strong {
+      color: #1f2937;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .how-it-works ul {
+      margin: 8px 0 0 0;
+      padding-left: 20px;
+    }
+    .how-it-works li {
+      margin: 4px 0;
+    }
+    .trending-topics {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 15px;
+      background: #f9fafb;
+    }
+    .trending-topic {
+      padding: 6px 8px;
+      margin: 4px 0;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .trending-topic:hover {
+      background: #f0f4ff;
+      border-color: #667eea;
+    }
+    .trending-topic.selected {
+      background: #667eea;
+      color: white;
+    }
+    .idea-item {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      border: 1px solid #e5e7eb;
+    }
+    .idea-text {
+      font-size: 13px;
+      color: #333;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .idea-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-size: 13px;
+    }
+    .spinner {
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #667eea;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .refresh-btn {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="emoji">🤖✨</div>
+    <h2>ToneGenie</h2>
+    
+    <div class="tabs">
+      <button class="tab active" data-tab="settings">Settings</button>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="settings-tab" class="tab-content active">
+      <div class="subtitle">One-time setup, then use directly on Twitter!</div>
+      
+      <div class="input-group">
+        <label for="apiKey">🔑 Groq API Key</label>
+        <input type="password" id="apiKey" placeholder="Enter your free Groq API key">
+        <div class="api-note">
+          Get yours at <a href="https://console.groq.com" target="_blank">console.groq.com</a> (free, no credit card)
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="openRouterKey">🚀 OpenRouter API Key (Fallback)</label>
+        <input type="password" id="openRouterKey" placeholder="Enter your OpenRouter API key">
+        <div class="api-note">
+          Get yours at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> (for free model fallback)
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="userPersona">🎭 Custom Persona / Bio (Optional)</label>
+        <textarea id="userPersona" placeholder="e.g. I'm a 20yo indie hacker building AI tools. I speak nicely but casually."></textarea>
+        <div class="api-note">The AI will adopt this bio for all comments.</div>
+      </div>
+
+      <div class="input-group">
+        <label for="personaSelect">🧬 Persona Profile (from /personas folder)</label>
+        <select id="personaSelect">
+          <option value="">No profile selected</option>
+        </select>
+        <div class="api-note" id="personaCount">Profiles loaded: 0</div>
+      </div>
+
+      <button id="saveBtn">Save & Activate</button>
+
+      <div id="status" class="status"></div>
+
+      <div class="divider"></div>
+
+      <div class="how-it-works" style="margin-bottom: 14px;">
+        <strong>⏱️ Usage Summary</strong>
+        <div id="yesterdayUsageTime">Yesterday: Loading...</div>
+        <div id="last7DaysUsageTime">Last 7 days: Loading...</div>
+        <div id="last30DaysUsageTime">Last 30 days: Loading...</div>
+      </div>
+
+      <div class="how-it-works">
+        <strong>📌 How to use after setup:</strong>
+        <ul>
+          <li>Go to any tweet on Twitter/X</li>
+          <li>Click the reply button</li>
+          <li>You'll see style buttons appear!</li>
+          <li>Click any style to generate comment</li>
+          <li>Comment fills automatically</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

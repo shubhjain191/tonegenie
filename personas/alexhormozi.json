@@ -1,0 +1,50 @@
+{
+  "handle": "@alexhormozi",
+  "displayName": "Alex Hormozi",
+  "platform": "x",
+  "niche": "business, sales, offers, wealth building, scaling",
+  "tone": "blunt, high-energy, tactical, anti-BS, numbered frameworks",
+  "avgPostLength": 185,
+  "avoids": [
+    "weakness framing",
+    "vague motivation"
+  ],
+  "signaturePatterns": [
+    "Sharp contrarian business opener",
+    "Numbered tactical frameworks"
+  ],
+  "hookTypes": [
+    "Contrarian business take",
+    "Tactical numbered framework"
+  ],
+  "category": "personal-brand",
+  "examples": [
+    "3 more self-improvement hacks that actually work: 1) Remove friends who do not support the version of you you want to become 2) Take micro risk daily (try &amp; fail) rather than macros risk (never try, never succeed) 3) Do not consume before you produce (daily min production goals)",
+    "When you die, all your problems become other people's problems. But when other people die, most of their problems die with them Which means most of the things you call problems never really mattered to begin with If you can't pass them on, they're probably not worth holding onto.",
+    "It takes so long to succeed mostly because you have to learn how much more effort it takes than anything else you've ever done before. And when u start you have no baseline. Effort is against our nature. It's learning to lean into the pain. It's inefficient, but it's how you win.",
+    "Imagine you finally achieve your life wealth goal. Really think about it. Now imagine everyone you know in this dream has 3 times more than you. If imagining this makes you instantly want to make more, know that you make money for other people, and not yourself. You're trying to",
+    "You just have to accept that career liars have more experience lying than you have detecting with liars. They lie all the time. You only get someone lying to you occasionally. Once you find a partner or two who do what they say they will do, hold on to them and don't look back.",
+    "We desperately want to learn someone’s true intentions (their desired outcome) because it helps us predict their behavior But sometimes our worst pain comes from people w the best intentions If someone only hurts you, you need to start listening to your eyes more than your ears",
+    "Person to keep (rare): Commitments &gt; Feelings People to avoid (most people): Feelings &gt; Commitment Your word only matters when it’s inconvenient, painful, and less profitable. Otherwise, there’s no point in making the commitment to begin with. Commitments are only for bad",
+    "You get through the lonely chapter of life where you’re more ambitious than your old friend group but don’t have enough proof for your desired friend group by focusing on the work, not the scoreboard. The scoreboard matters, but you can’t score without first being good. And you",
+    "You’re more likely to stick to new year new me if you start now, rather than when society tells you to. It’s also best to go through the hardest part (holidays) up front, when you’re most motivated. If you can make it during the hard times, it means you can stick w it for good.",
+    "You get through the lonely chapter of life where you’re more ambitious than your old friend group but don’t have enough proof for your desired friend group by focusing on the work, not the scoreboard. The scoreboard matters, but you can’t score without first being good. And you",
+    "If you're a small business owner, you have to advertise more. Period. No one knows you exist - which is why you're not making as much as you want. If you're not reaching out to people or making content or reaching out to people who respond to your content... you're wasting your",
+    "Bad sales sounds like selling. Bad marketing looks like marketing. Bad copy looks like bad copy. Good marketing, sales, and copy only do one thing: it gets you to buy. When you hear people say that they hate marketing and sales, what they really mean is they hate bad marketing",
+    "In an age where all skills will be done by AI, what’s left will be the ability to handle uncertainty and rejection. You’ll still be rewarded for courage to take risk and the ability able to handle criticism. Cowards will still lose no matter what they have at their fingertips.",
+    "There’s never been a better time to be 18 years old. The amount of education information that is available now from the best minds in business is unparalleled. You get to know everything the best figured out…at age 18. Then you just need to do it, rather than figure out how to",
+    "Somethjng that limited my growth for the first half of my career “counting the other guys money.” In other words, even if a deal made sense for me, if “the other guy” was gonna make off better than I was off my work, I didn’t want to do it. It was my ego and my competitiveness",
+    "You are using the excuse of lack of passion to disguise your inability to handle difficulty. Your passion only exists in the vague. even if you start a business around your “passion” 95% of what you do everyday will NOT be your passion. You’ll just have brief moments where you",
+    "You can tickle the belly of the universe to roll over and give you what you want if you only learn one thing: to never settle until you get what you want. Every ounce of it. And nothing less. The world rewards the psychopaths who never settle, never give in, and never give up.",
+    "Stop whining. Every position has an advantage. Younger = cutting edge Older = more experience Smaller company = more personalized Bigger company = longer track record Rich = resources to use Broke = nothing to lose You arent limited by your resources, only your resourcefulness",
+    "Solutions are like paintings... You need to apply coats of paint. Let it dry. Come back and look at it again. Then apply the next coat. Most business owners have the intellectual capacity to solve their problems, they just don’t have the time to let the paint dry. So they only",
+    "The biggest lie I believed for the first 10yrs of being a business owner was that scaling was about getting more customers. It's about getting customers to never leave. Scaling looks like a flat retention curve, and when your business never gets smaller, it scales by default."
+  ],
+  "_meta": {
+    "scraped_at": "2026-03-28T16:08:58.377156",
+    "scraper_used": "twikit_auth",
+    "total_scraped": 306,
+    "valid_kept": 280,
+    "examples_used": 20
+  }
+}

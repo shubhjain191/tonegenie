@@ -1,0 +1,51 @@
+{
+  "handle": "@AndrewYNg",
+  "displayName": "Andrew Ng",
+  "platform": "x",
+  "niche": "AI education, machine learning, workforce and policy",
+  "tone": "accessible professor, optimistic about applied AI, course launches mixed with civic takes",
+  "avgPostLength": 260,
+  "avoids": [
+    "unnecessary jargon walls",
+    "pure hype without teaching angle"
+  ],
+  "signaturePatterns": [
+    "Announces DeepLearning.ai / Coursera courses and collabs with OpenAI, Anthropic",
+    "Numbered threads explaining AI risks vs benefits with concrete examples",
+    "Short encouragement to learn coding or ML despite AI automation fears"
+  ],
+  "hookTypes": [
+    "Course or product announcement",
+    "Policy or social issue + personal stake"
+  ],
+  "category": "ai-tech",
+  "examples": [
+    "New course: Gemini CLI: Code &amp; Create with an Open-Source Agent, built with @googlecloudtech/@geminicli and taught by @JackWoth98. Agentic coding assistants like Gemini CLI are transforming how developers work. This short course teaches you to use Google's open-source agent to",
+    "Job seekers in the U.S. and many other nations face a tough environment. At the same time, fears of AI-caused job loss have — so far — been overblown. However, the demand for AI skills is starting to cause shifts in the job market. I’d like to share what I’m seeing on the ground.",
+    "AI agents are getting better at looking at different types of data in businesses to spot patterns and create value. This is making data silos increasingly painful. This is why I increasingly try to select software that lets me control my own data, so I can make it available to my",
+    "Last week, China barred its major tech companies from buying Nvidia chips. This move received only modest attention in the media, but has implications beyond what’s widely appreciated. Specifically, it signals that China has progressed sufficiently in semiconductors to break away",
+    "Agentic Document Extraction now supports field extraction! Many doc extraction use cases extract specific fields from forms and other structured documents. You can now input a picture or PDF of an invoice, request the vendor name, item list, and prices, and get back the extracted",
+    "Hanging out with @juberti , OpenAI’s head of realtime AI, responsible for the company’s voice AI products. One thing both of us agree on: while some things in AI are overhyped, voice applications seem underhyped right now. The application opportunities seem larger than the amount",
+    "Should there be a Stack Overflow for AI coding agents to share learnings with each other? Last week I announced Context Hub (chub), an open CLI tool that gives coding agents up-to-date API documentation. Since then, our GitHub repo has gained over 6K stars, and we've scaled from",
+    "Sharing a fun recipe for building a highly autonomous, moderately capable, and very UNreliable agent using the open source aisuite package that Rohit Prasad and I have been working on. With a few lines of code, you can give a frontier LLM a tool (like disk access or web search),",
+    "I just got back from AI Dev x NYC, the AI developer conference where our community gathers for a day of coding, learning, and connecting. The vibe in the room was buzzing! It was at the last AI Dev in San Francisco that I met up with Kirsty Tan and started collaborating with her",
+    "I recently received an email titled “An 18-year-old’s dilemma: Too late to contribute to AI?” Its author, who gave me permission to share this, is preparing for college. He is worried that by the time he graduates, AI will be so good there’s no meaningful work left for him to do",
+    "There is significant unmet demand for developers who understand AI. At the same time, because most universities have not yet adapted their curricula to the new reality of programming jobs being much more productive with AI tools, there is also an uptick in unemployment of recent",
+    "Buildathon: The Rapid Engineering Competition livestreams this Saturday, August 16. Top developers will compete to build 5+ products in a single day using AI coding assistants – projects that traditionally took weeks. Watch live as they advance through semifinals and finals, and",
+    "The invention of modern writing instruments like the typewriter made writing easier, but they also led to the rise of writer’s block, where deciding what to write became the bottleneck. Similarly, the invention of agentic coding assistants has led to a new builder’s block, where",
+    "On Monday, a United States District Court ruled that training LLMs on copyrighted books constitutes fair use. A number of authors had filed suit against Anthropic for training its models on their books without permission. Just as we allow people to read books and learn from them",
+    "There’s a new breed of GenAI Application Engineers who can build more-powerful applications faster than was possible before, thanks to generative AI. Individuals who can play this role are highly sought-after by businesses, but the job description is still coming into focus. Let",
+    "I hope we can empower everyone to build with AI. Starting from K-12, we should teach every student AI enabled coding, since this will enable them to become more productive and more empowered adults. But there is a huge shortage of computer science (CS) teachers. I recently spoke",
+    "New course: Agent Memory: Building Memory-Aware Agents, built in partnership with @Oracle and taught by @richmondalake and Nacho Martínez. Many agents work well within a single session but their memory resets once the session ends. Consider a research agent working on dozens of",
+    "Happy 2026! Will this be the year we finally achieve AGI? I’d like to propose a new version of the Turing Test, which I’ll call the Turing-AGI Test, to see if we’ve achieved this. I’ll explain in a moment why having a new test is important. The public thinks achieving AGI means",
+    "Releasing a new \"Agentic Reviewer\" for research papers. I started coding this as a weekend project, and @jyx_su made it much better. I was inspired by a student who had a paper rejected 6 times over 3 years. Their feedback loop -- waiting ~6 months for feedback each time -- was",
+    "Learn to build your own voice-activated AI assistant that can execute tasks like gathering recent AI news from the web, scripting out a podcast, and using tools to put all that into a multi-speaker podcast. See our new short course: \"Building Live Voice Agents with Google’s ADK"
+  ],
+  "_meta": {
+    "scraped_at": "2026-03-28T17:11:34.533001",
+    "scraper_used": "twikit_auth",
+    "total_scraped": 114,
+    "valid_kept": 101,
+    "examples_used": 20
+  }
+}

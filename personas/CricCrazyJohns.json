@@ -1,0 +1,47 @@
+{
+  "handle": "@CricCrazyJohns",
+  "displayName": "Johns",
+  "platform": "x",
+  "niche": "cricket stats, moments, viral cricket clips context",
+  "tone": "enthusiastic cricket fan account, share-heavy",
+  "avgPostLength": 128,
+  "avoids": [],
+  "signaturePatterns": [
+    "Stat lines and moment-of-the-day style posts",
+    "Reactions to big innings or wickets"
+  ],
+  "hookTypes": [
+    "Stat flex or comparison",
+    "Moment celebration"
+  ],
+  "category": "cricket",
+  "examples": [
+    "The New RCB Co-Owner Satyan Gajwani via PTI: \"Virat is an iconic player, we are greatful to be able to partner with him - when the deal finally gets completed, I am sure we will have close conversations with him &amp; his team to understand their goals &amp; objectives - how we can",
+    "RUTURAJ GAIKWAD ON SANJU SAMSON. [CSK YT] \"3 years ago Sanju asked me how is Mahi bhai? How's the environment of CSK ? Will you be the next Captain? I just told him that I don't care about Captaincy, I just love to play here, culture &amp; atmosphere. In fact Saju told me that - I",
+    "Axar Patel about the Impact Player rule. [Bharat Sharma from PTI] \"I don't like this rule as I am all rounder myself (laughs). Earlier we used to pick all-rounder for this role (batting &amp; bowling). Now team management goes with a particular batter or bowler, they say why do we",
+    "RUTURAJ ON MS DHONI. [CSK YT] \"I have huge respect for Mahi Bhai. He doesn't attend team discussions himself, he wants Fleming and me to take things forward. He tells us, 'Even if you ask for my advice, you don't necessarily have to follow it'. He believes our ideas should drive",
+    "Axar Patel talks about the vision of Jay Shah: [TV9 Bharatvarsh] \"The vision of BCCI &amp; Jay bhai led us to winning so much. We received proper credit and appreciation for the efforts that make us feel proud and help us perform better. Even the winning price is great. The test",
+    "WEST INDIES TOUR TO INDIA 2026: 3 ODIs (Trivandrum, Guwahati, New Chandigarh) 5 T20Is (Lucknow, Ranchi, Indore, Hyderabad, Bengaluru) SRI LANKA TOUR TO INDIA 2026: 3 ODI (Delhi, Bengaluru, Ahmedabad) 3 T20I (Rajkot, Cuttack, Pune) ZIMBABWE TOUR TO INDIA 2027: 3 ODI (Kolkata,",
+    "🚨 STAR SPORTS EXPERTS PICK TOP 4 TEAMS IN IPL 2026 🚨 Faf - MI, RCB, PBKS, CSK or DC Irfan - MI, DC, PBKS, RR Harbhajan - MI, SRH, PBKS Aakash - MI, RCB, DC, PBKS Pujara -MI, GT, CSK, KKR Kaif - MI, RCB, PBKS, DC Vihari - MI, SRH, DC, PBKS Chawla - MI, RCB, KKR, PBKS Saba",
+    "Q: Who is going to win the Orange Cap in IPL 2026? [Ranveer Allahbadia] Jitesh Sharma said \"Virat Kohli, No doubt. I feel he is going to break the highest ever runs record in an IPL season, the way he was batting for India, he is looking in sublime touch this time\".",
+    "🚨 NO OPENING CEREMONY IN IPL 2026 🚨 - BCCI Secratary has confirmed that there won't be any opening ceremony at Chinnaswamy stadium as mark of respect for the tragedy on June 4th. [Gaurav Gupta/TOI] They are planning to conduct a grand closing ceremony on May 31st",
+    "🚨 CSK SCHEDULE IN IPL 2026 🚨 30th March vs RR 3rd April vs PBKS 5th April vs RCB 11th April vs DC 14th April vs KKR 18th April vs SRH 23rd April vs MI 26th April vs GT 2nd May vs MI 5th May vs DC 10th May vs LSG 15th May vs LSG 18th May vs SRH 21st May vs GT",
+    "I've been carrying a charging cable in my pocket every single day for the last two years like it's a basic necessity. The vivo T5x on Flipkart with 7200 mAh is genuinely making me rethink that. Sale starts on 24th March, 12 PM. #vivoT5x #vivoT5xOnFlipkart",
+    "The Times of India ad said everything without saying too much. POCO X8 Pro Series. India's first Dimensity 9500s. 9000mAh Mega Battery. 3MN+ AnTuTu score. Starting at Rs.29,999. Sale starts 23rd March, 12PM on Flipkart! #POCOX8ProSeriesOnFlipkart",
+    "Sanjiv Goenka said \"For any sports team, until you win, you don’t receive the same level of respect - We’ve made the playoffs twice but that’s clearly not good enough. You win some, you lose some, but we have to win our first trophy\". [JioStar]",
+    "Pat Cummins said \"When I captained Sunrisers Hyderabad for the first time, my followers in Instagram went from 2 million to 3 &amp; half million followers in a month - IPL is a big one, the whole city go behind us\". [Business of Sport YT]",
+    "Ayush Mhatre batted at number 3 on his IPL debut - scored 32(15) vs Mumbai Indians at Wankhede. 👌 - It will be interesting whether they will play Mhatre or Urvil at 3. Rutu, Sanju, _____, Brevis, Dube, Kartik, Dhoni, Veer might be Top 8.",
+    "🚨 11 EMPTY SEATS TO REMEMBER THE TRAGIC LOSS🚨 - Karnataka Cricket Association has decided to unveil a memorial Plaque, along with RCB, it will reserve 11 seats in the Chinnaswamy stadium in the memory of the stampede victims. [TOI]",
+    "🚨 BORDER GAVASKAR TROPHY 2027 SCHEDULE 🚨 1st Test - Jan 21 to Jan 25 (Nagpur) 2nd Test - Jan 29 to Feb 2 (Chennai) 3rd Test - Feb 11 to Feb 15 (Guwahati) 4th Test - Feb 19 to Feb 23 (Ranchi) 5th Test - Feb 27 to Mar 3 (Ahmedabad)",
+    "🚨 SUN GROUP FOR HYDERABAD STADIUM 🫡 - Cost of more than 10 Crores. - 46 Toilets. - 42 Boxes including Lounge. - Two Elevators. - 43 Air Conditioners. Well done, Kaviya Maran &amp; whole Sun Group, making the life of fans easier.",
+    "Cooper Connolly about Shreyas Iyer. [Pratyush Raj from TOI] \"He is World class player, I love watching him bat - it just looks so easy - so it would be nice to pick his brain - I am just looking forward to learning from him\".",
+    "ICC CEO SANJOG GUPTA 🗣️ \"Three of the top four most watched events on streaming platforms everywhere in the world are now matches from ICC events - which demonstrates the scale that cricket's global pinnacle events deliver\"."
+  ],
+  "_meta": {
+    "scraped_at": "2026-03-28T14:16:44.016155",
+    "scraper_used": "twikit_auth",
+    "total_scraped": 300,
+    "valid_kept": 171,
+    "examples_used": 20
+  }
+}
