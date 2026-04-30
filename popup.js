@@ -1,4 +1,3 @@
-let loadedPersonaLibrary = {};
 let usageRefreshInterval = null;
 
 // Tab switching
@@ -17,6 +16,35 @@ function showStatus(message, type) {
   statusDiv.textContent = message;
   statusDiv.className = `status ${type}`;
   statusDiv.style.display = 'block';
+}
+
+function setupSecretFieldControls(inputId, toggleId, copyId, fieldName) {
+  const input = document.getElementById(inputId);
+  const toggleBtn = document.getElementById(toggleId);
+  const copyBtn = document.getElementById(copyId);
+  if (!input || !toggleBtn || !copyBtn) return;
+
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    toggleBtn.textContent = isHidden ? '🙈' : '👁️';
+    toggleBtn.title = isHidden ? `Hide ${fieldName}` : `Show ${fieldName}`;
+    toggleBtn.setAttribute('aria-label', toggleBtn.title);
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    const value = input.value.trim();
+    if (!value) {
+      showStatus(`Enter ${fieldName} first`, 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      showStatus(`${fieldName} copied to clipboard`, 'success');
+    } catch {
+      showStatus(`Could not copy ${fieldName}`, 'error');
+    }
+  });
 }
 
 function formatUsageDateKey(dateInput = new Date()) {
@@ -78,129 +106,19 @@ async function notifyTwitterTabs(action = 'apiKeyUpdated') {
   }
 }
 
-function isValidPersonaProfile(profile) {
-  return Boolean(
-    profile &&
-    typeof profile === 'object' &&
-    typeof profile.handle === 'string' &&
-    profile.handle.trim() &&
-    typeof profile.tone === 'string'
-  );
-}
-
-function normalizePersonaProfile(profile) {
-  if (!profile || typeof profile !== 'object') return null;
-  const handleRaw = (profile.handle || '').toString().trim();
-  const handle = handleRaw.startsWith('@') ? handleRaw : (handleRaw ? `@${handleRaw}` : '');
-  if (!handle || typeof profile.tone !== 'string') return null;
-
-  return {
-    ...profile,
-    handle,
-    displayName: (profile.displayName || handle).toString().trim(),
-    tone: (profile.tone || '').toString().trim(),
-    niche: (profile.niche || '').toString().trim(),
-    avoids: Array.isArray(profile.avoids) ? profile.avoids.map(v => (v || '').toString().trim()).filter(Boolean) : [],
-    signaturePatterns: Array.isArray(profile.signaturePatterns) ? profile.signaturePatterns.map(v => (v || '').toString().trim()).filter(Boolean) : [],
-    hookTypes: Array.isArray(profile.hookTypes) ? profile.hookTypes.map(v => (v || '').toString().trim()).filter(Boolean) : [],
-    examples: Array.isArray(profile.examples) ? profile.examples.map(v => (v || '').toString().trim()).filter(Boolean) : []
-  };
-}
-
-function renderPersonaDropdown(activePersonaHandle = '') {
-  const personaSelect = document.getElementById('personaSelect');
-  const personaCount = document.getElementById('personaCount');
-  personaSelect.innerHTML = '<option value="">No profile selected</option>';
-
-  const entries = Object.values(loadedPersonaLibrary)
-    .filter(isValidPersonaProfile)
-    .sort((a, b) => (a.displayName || a.handle).localeCompare(b.displayName || b.handle));
-
-  entries.forEach((profile) => {
-    const opt = document.createElement('option');
-    opt.value = profile.handle;
-    opt.textContent = `${profile.displayName || profile.handle} (${profile.handle})`;
-    personaSelect.appendChild(opt);
-  });
-
-  if (activePersonaHandle && loadedPersonaLibrary[activePersonaHandle]) {
-    personaSelect.value = activePersonaHandle;
-  }
-
-  personaCount.textContent = `Profiles loaded: ${entries.length}`;
-}
-
-async function loadBundledPersonaLibrary() {
-  try {
-    const indexUrl = chrome.runtime.getURL('personas/index.json');
-    const indexRes = await fetch(indexUrl);
-    if (!indexRes.ok) {
-      return {};
-    }
-
-    const indexData = await indexRes.json();
-    const files = Array.isArray(indexData.files) ? indexData.files : [];
-    const library = {};
-    let invalidCount = 0;
-
-    for (const fileName of files) {
-      if (!fileName || typeof fileName !== 'string') continue;
-      const fileUrl = chrome.runtime.getURL(`personas/${fileName}`);
-      try {
-        const fileRes = await fetch(fileUrl);
-        if (!fileRes.ok) continue;
-        const profile = await fileRes.json();
-        const normalized = normalizePersonaProfile(profile);
-        if (isValidPersonaProfile(normalized)) {
-          library[normalized.handle] = normalized;
-        } else {
-          invalidCount++;
-        }
-      } catch (e) {
-        invalidCount++;
-      }
-    }
-    if (invalidCount > 0) {
-      showStatus(`Skipped ${invalidCount} invalid persona file(s).`, 'error');
-    }
-    return library;
-  } catch (error) {
-    return {};
-  }
-}
 
 async function initializePopup() {
+  setupSecretFieldControls('apiKey', 'toggleApiKey', 'copyApiKey', 'Groq API key');
+  setupSecretFieldControls('openRouterKey', 'toggleOpenRouterKey', 'copyOpenRouterKey', 'OpenRouter API key');
+
   const stored = await chrome.storage.local.get([
     'apiKey',
-    'openRouterKey',
-    'userPersona',
-    'personaLibrary',
-    'activePersonaHandle'
+    'openRouterKey'
   ]);
 
   if (stored.apiKey) document.getElementById('apiKey').value = stored.apiKey;
   if (stored.openRouterKey) document.getElementById('openRouterKey').value = stored.openRouterKey;
-  if (stored.userPersona) document.getElementById('userPersona').value = stored.userPersona;
 
-  const bundledLibrary = await loadBundledPersonaLibrary();
-  loadedPersonaLibrary = Object.keys(bundledLibrary).length > 0
-    ? bundledLibrary
-    : (stored.personaLibrary || {});
-
-  let activePersonaHandle = stored.activePersonaHandle || '';
-  if (activePersonaHandle && !loadedPersonaLibrary[activePersonaHandle]) {
-    activePersonaHandle = '';
-  }
-  if (!activePersonaHandle && Object.keys(loadedPersonaLibrary).length > 0) {
-    activePersonaHandle = Object.keys(loadedPersonaLibrary)[0];
-  }
-
-  renderPersonaDropdown(activePersonaHandle);
-
-  await chrome.storage.local.set({
-    personaLibrary: loadedPersonaLibrary,
-    activePersonaHandle
-  });
 
   await refreshUsageSummaryDisplay();
   if (usageRefreshInterval) {
@@ -209,19 +127,11 @@ async function initializePopup() {
   usageRefreshInterval = setInterval(refreshUsageSummaryDisplay, 30000);
 }
 
-document.getElementById('personaSelect').addEventListener('change', async (e) => {
-  const activePersonaHandle = e.target.value || '';
-  await chrome.storage.local.set({ activePersonaHandle });
-  await notifyTwitterTabs('personasUpdated');
-  showStatus('Persona profile updated.', 'success');
-});
 
 // Save button handler
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const apiKey = document.getElementById('apiKey').value.trim();
   const openRouterKey = document.getElementById('openRouterKey').value.trim();
-  const userPersona = document.getElementById('userPersona').value.trim();
-  const activePersonaHandle = document.getElementById('personaSelect').value || '';
   const btn = document.getElementById('saveBtn');
 
   if (!apiKey) {
@@ -250,14 +160,11 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     await chrome.storage.local.set({
       apiKey,
-      openRouterKey,
-      userPersona,
-      personaLibrary: loadedPersonaLibrary,
-      activePersonaHandle
+      openRouterKey
     });
 
     await notifyTwitterTabs('apiKeyUpdated');
-    showStatus('✓ Settings saved! Persona + API are active on Twitter/X.', 'success');
+    showStatus('✓ Settings saved! API is active on Twitter/X.', 'success');
   } catch (error) {
     showStatus('Invalid API key. Please check and try again.', 'error');
   } finally {
@@ -267,7 +174,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 });
 
 initializePopup().catch(() => {
-  showStatus('Could not load persona profiles. Check personas/index.json', 'error');
+  showStatus('Could not initialize popup settings.', 'error');
 });
 
 window.addEventListener('beforeunload', () => {

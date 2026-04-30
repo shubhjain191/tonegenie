@@ -95,6 +95,39 @@
       outline: none;
       border-color: #667eea;
     }
+    .secret-input-wrap {
+      display: flex;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .secret-input-wrap input {
+      flex: 1;
+      min-width: 0;
+    }
+    .secret-action {
+      width: auto;
+      min-width: 38px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 2px solid #e5e7eb;
+      background: #f9fafb;
+      color: #374151;
+      font-size: 14px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transform: none;
+    }
+    .secret-action:hover {
+      border-color: #cbd5e1;
+      background: #f3f4f6;
+      transform: none;
+    }
+    .secret-action:active {
+      transform: none;
+    }
     .api-note {
       font-size: 11px;
       color: #666;
@@ -270,7 +303,11 @@
       
       <div class="input-group">
         <label for="apiKey">🔑 Groq API Key</label>
-        <input type="password" id="apiKey" placeholder="Enter your free Groq API key">
+        <div class="secret-input-wrap">
+          <input type="password" id="apiKey" placeholder="Enter your free Groq API key">
+          <button type="button" class="secret-action" id="toggleApiKey" title="Show API key" aria-label="Show API key">👁️</button>
+          <button type="button" class="secret-action" id="copyApiKey" title="Copy API key" aria-label="Copy API key">⧉</button>
+        </div>
         <div class="api-note">
           Get yours at <a href="https://console.groq.com" target="_blank">console.groq.com</a> (free, no credit card)
         </div>
@@ -278,25 +315,17 @@
 
       <div class="input-group">
         <label for="openRouterKey">🚀 OpenRouter API Key (Fallback)</label>
-        <input type="password" id="openRouterKey" placeholder="Enter your OpenRouter API key">
+        <div class="secret-input-wrap">
+          <input type="password" id="openRouterKey" placeholder="Enter your OpenRouter API key">
+          <button type="button" class="secret-action" id="toggleOpenRouterKey" title="Show OpenRouter key" aria-label="Show OpenRouter key">👁️</button>
+          <button type="button" class="secret-action" id="copyOpenRouterKey" title="Copy OpenRouter key" aria-label="Copy OpenRouter key">⧉</button>
+        </div>
         <div class="api-note">
           Get yours at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> (for free model fallback)
         </div>
       </div>
 
-      <div class="input-group">
-        <label for="userPersona">🎭 Custom Persona / Bio (Optional)</label>
-        <textarea id="userPersona" placeholder="e.g. I'm a 20yo indie hacker building AI tools. I speak nicely but casually."></textarea>
-        <div class="api-note">The AI will adopt this bio for all comments.</div>
-      </div>
 
-      <div class="input-group">
-        <label for="personaSelect">🧬 Persona Profile (from /personas folder)</label>
-        <select id="personaSelect">
-          <option value="">No profile selected</option>
-        </select>
-        <div class="api-note" id="personaCount">Profiles loaded: 0</div>
-      </div>
 
       <button id="saveBtn">Save & Activate</button>
 

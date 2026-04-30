@@ -1,9 +1,5 @@
 ﻿let apiKey = null;
 let openRouterKey = null;
-let userPersona = '';
-let personaLibrary = {};
-let activePersonaHandle = '';
-let activePersona = null;
 let generationCount = 0;
 let usageTrackingInitialized = false;
 let usageSessionStart = null;
@@ -13,6 +9,145 @@ let usageWidgetInterval = null;
 let usageCurrentDayKey = formatUsageDateKey();
 let usageTodayMsCache = 0;
 let usageCacheLoaded = false;
+const recentInsertions = new WeakMap();
+const insertLocks = new WeakMap();
+const containerGenerationLocks = new WeakMap();
+const recentProgrammaticComposeWrites = new WeakMap();
+
+// Robust global session-wide locking for insertions
+let globalLastInsertSig = '';
+let globalLastInsertTime = 0;
+let composeMutationPausedUntil = 0;
+const COMPOSE_MUTATION_COOLDOWN_MS = 350;
+const PROGRAMMATIC_WRITE_TRACK_MS = 1500;
+
+// Global states to prevent multiple initializations
+let mainObserver = null;
+let hashtagMonitorInterval = null;
+let trendingUpdateInterval = null;
+let isInitializing = false;
+
+function pauseComposeMutationHandling(ms = COMPOSE_MUTATION_COOLDOWN_MS) {
+  composeMutationPausedUntil = Math.max(composeMutationPausedUntil, Date.now() + ms);
+}
+
+function isComposeMutationHandlingPaused() {
+  return Date.now() < composeMutationPausedUntil;
+}
+
+function markProgrammaticComposeWrite(replyBox, insertedText, cooldownMs = COMPOSE_MUTATION_COOLDOWN_MS) {
+  if (!replyBox) return;
+  recentProgrammaticComposeWrites.set(replyBox, {
+    signature: normalizeWhitespace(insertedText),
+    expiresAt: Date.now() + PROGRAMMATIC_WRITE_TRACK_MS
+  });
+  pauseComposeMutationHandling(cooldownMs);
+}
+
+function isRecentProgrammaticComposeWrite(replyBox, textToCheck = '') {
+  if (!replyBox) return false;
+  const record = recentProgrammaticComposeWrites.get(replyBox);
+  if (!record) return false;
+  if (Date.now() > record.expiresAt) {
+    recentProgrammaticComposeWrites.delete(replyBox);
+    return false;
+  }
+  if (!textToCheck) return true;
+  return record.signature === normalizeWhitespace(textToCheck);
+}
+
+function getActiveComposeTextArea() {
+  const composeSelectors = [
+    '[data-testid="tweetTextarea_0"][contenteditable="true"]',
+    'div[contenteditable="true"][role="textbox"][data-testid*="tweetTextarea"]',
+    '[contenteditable="true"][aria-label*="What\'s happening"]',
+    '[contenteditable="true"][aria-label*="Post"]',
+    '[contenteditable="true"][aria-label*="Tweet"]'
+  ];
+
+  for (const selector of composeSelectors) {
+    const candidate = document.querySelector(selector);
+    if (candidate && candidate.getAttribute('contenteditable') === 'true') {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getSharedInsertGuardState() {
+  if (typeof window === 'undefined') return null;
+  if (!window.__tonegenieInsertGuard) {
+    window.__tonegenieInsertGuard = { sig: '', ts: 0 };
+  }
+  return window.__tonegenieInsertGuard;
+}
+
+function passesSharedInsertGuard(normalizedText, now, ttlMs = 5000) {
+  const guard = getSharedInsertGuardState();
+  if (!guard) return true;
+  if (guard.sig === normalizedText && (now - guard.ts) < ttlMs) {
+    return false;
+  }
+  guard.sig = normalizedText;
+  guard.ts = now;
+  return true;
+}
+
+function isElementVisible(element) {
+  if (!element || !element.getBoundingClientRect) return false;
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function resolveReplyBox(selector = null) {
+  const candidates = [];
+  const seen = new Set();
+
+  const addCandidate = (node) => {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    candidates.push(node);
+  };
+
+  addCandidate(composeTextArea);
+  addCandidate(getActiveComposeTextArea());
+
+  if (selector) {
+    const selectorParts = selector.split(',').map(s => s.trim()).filter(Boolean);
+    selectorParts.forEach((part) => {
+      try {
+        document.querySelectorAll(part).forEach(addCandidate);
+      } catch {
+        // Ignore invalid selector fragments.
+      }
+    });
+  }
+
+  const editable = candidates.filter(node => node && node.getAttribute && node.getAttribute('contenteditable') === 'true');
+  if (editable.length === 0) return null;
+  return editable.find(isElementVisible) || editable[0];
+}
+
+function dedupeInsertedTextIfRepeated(replyBox, expectedText) {
+  if (!replyBox || !expectedText) return false;
+  const normalizedExpected = normalizeWhitespace(expectedText);
+  if (!normalizedExpected) return false;
+
+  const currentTextRaw = replyBox.innerText || replyBox.textContent || '';
+  const normalizedCurrent = normalizeWhitespace(currentTextRaw);
+  if (!normalizedCurrent) return false;
+
+  const doubled = `${normalizedExpected} ${normalizedExpected}`;
+  if (normalizedCurrent !== doubled) return false;
+
+  document.execCommand('selectAll', false, null);
+  const rewritten = document.execCommand('insertText', false, expectedText);
+  if (!rewritten) return false;
+
+  replyBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  return true;
+}
 
 function formatUsageDateKey(dateInput = new Date()) {
   const date = new Date(dateInput);
@@ -358,6 +493,35 @@ function clampCommentLength(text, maxChars = MAX_COMMENT_CHARS) {
   return trimmed;
 }
 
+function normalizeWhitespace(text) {
+  if (!text) return '';
+  // Convert non-breaking spaces and other weird whitespaces to normal spaces
+  const normalized = text.toString().replace(/[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g, ' ');
+  return normalized.replace(/\s+/g, ' ').trim();
+}
+
+function hasLoopingRepetition(text) {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+  if (!normalized) return false;
+
+  const words = normalized.split(' ').filter(Boolean);
+  if (words.length < 20) return false;
+
+  // Detect repeated 5-word chunks (common "AI loop" symptom)
+  const seenChunks = new Map();
+  for (let i = 0; i <= words.length - 5; i++) {
+    const chunk = words.slice(i, i + 5).join(' ');
+    seenChunks.set(chunk, (seenChunks.get(chunk) || 0) + 1);
+    if ((seenChunks.get(chunk) || 0) >= 3) {
+      return true;
+    }
+  }
+
+  // Detect low lexical variety in long text
+  const uniqueRatio = new Set(words).size / words.length;
+  return words.length >= 40 && uniqueRatio < 0.38;
+}
+
 function getMixedStyle(primaryStyle, tweetText) {
   const compatible = STYLE_MIX_COMPATIBILITY[primaryStyle] || [];
   if (compatible.length === 0) {
@@ -390,80 +554,6 @@ function getKeywordSet(text) {
   );
 }
 
-function getRelevantPersonaExamples(tweetText, examples, limit = 3) {
-  const cleanExamples = (Array.isArray(examples) ? examples : [])
-    .map(ex => decodeHtmlEntities(ex))
-    .filter(Boolean);
-  if (cleanExamples.length === 0) return [];
-
-  const tweetKeywords = getKeywordSet(tweetText);
-  const scored = cleanExamples.map((example) => {
-    const exampleKeywords = getKeywordSet(example);
-    let overlap = 0;
-    tweetKeywords.forEach((word) => {
-      if (exampleKeywords.has(word)) overlap++;
-    });
-    return { example, overlap };
-  });
-
-  scored.sort((a, b) => b.overlap - a.overlap);
-  return scored.slice(0, limit).map(item => item.example);
-}
-
-function getActivePersonaAvoidTerms() {
-  if (!activePersona || typeof activePersona !== 'object') {
-    return [];
-  }
-  return (Array.isArray(activePersona.avoids) ? activePersona.avoids : [])
-    .map(term => decodeHtmlEntities(term).toLowerCase())
-    .filter(Boolean)
-    .slice(0, 12);
-}
-
-function getActivePersonaInstruction(tweetText = '') {
-  if (!activePersona || typeof activePersona !== 'object') {
-    return '';
-  }
-
-  const tone = decodeHtmlEntities(activePersona.tone || '');
-  const niche = decodeHtmlEntities(activePersona.niche || '');
-  const avoids = getActivePersonaAvoidTerms();
-  const signatures = (Array.isArray(activePersona.signaturePatterns) ? activePersona.signaturePatterns : [])
-    .map(item => decodeHtmlEntities(item))
-    .filter(Boolean)
-    .slice(0, 4);
-  const hooks = (Array.isArray(activePersona.hookTypes) ? activePersona.hookTypes : [])
-    .map(item => decodeHtmlEntities(item))
-    .filter(Boolean)
-    .slice(0, 4);
-  const examples = getRelevantPersonaExamples(
-    tweetText || '',
-    activePersona.examples,
-    3
-  );
-
-  const sections = [];
-  sections.push(`Active profile: ${activePersona.displayName || activePersona.handle || 'custom persona'}`);
-  if (tone) sections.push(`Tone: ${tone}`);
-  if (niche) sections.push(`Niche focus: ${niche}`);
-  if (signatures.length) sections.push(`Signature patterns: ${signatures.join('; ')}`);
-  if (hooks.length) sections.push(`Preferred hooks: ${hooks.join('; ')}`);
-  if (avoids.length) sections.push(`Avoid these patterns: ${avoids.join('; ')}`);
-  if (examples.length) {
-    sections.push(`Style anchors (do not copy verbatim):\n${examples.map((ex, idx) => `${idx + 1}) ${ex}`).join('\n')}`);
-  }
-
-  sections.push('Mimic rhythm and framing, but write original text for this tweet.');
-  return sections.join('\n');
-}
-
-function applyPersonaSelection() {
-  if (!activePersonaHandle || !personaLibrary || typeof personaLibrary !== 'object') {
-    activePersona = null;
-    return;
-  }
-  activePersona = personaLibrary[activePersonaHandle] || null;
-}
 
 function normalizeStyleToken(token) {
   if (!token) return '';
@@ -641,15 +731,11 @@ setInterval(() => {
 // Load API key on page load
 if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
   try {
-    chrome.storage.local.get(['apiKey', 'openRouterKey', 'userPersona', 'personaLibrary', 'activePersonaHandle'], (result) => {
+    chrome.storage.local.get(['apiKey', 'openRouterKey'], (result) => {
       if (chrome.runtime?.id) {
         if (result.apiKey) {
           apiKey = result.apiKey;
           openRouterKey = result.openRouterKey || null;
-          userPersona = result.userPersona || '';
-          personaLibrary = result.personaLibrary || {};
-          activePersonaHandle = result.activePersonaHandle || '';
-          applyPersonaSelection();
           console.log('tonegenie: API keys loaded');
           initExtension();
         } else {
@@ -670,16 +756,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     // Check if context is still valid
     if (typeof chrome === 'undefined' || !chrome.runtime?.id) return;
 
-    if (request.action === 'apiKeyUpdated' || request.action === 'personasUpdated') {
+    if (request.action === 'apiKeyUpdated') {
       try {
-        chrome.storage.local.get(['apiKey', 'openRouterKey', 'userPersona', 'personaLibrary', 'activePersonaHandle'], (result) => {
+        chrome.storage.local.get(['apiKey', 'openRouterKey'], (result) => {
           if (chrome.runtime?.id) {
             apiKey = result.apiKey;
             openRouterKey = result.openRouterKey || null;
-            userPersona = result.userPersona || '';
-            personaLibrary = result.personaLibrary || {};
-            activePersonaHandle = result.activePersonaHandle || '';
-            applyPersonaSelection();
             console.log('tonegenie: API keys updated');
             initExtension();
             initComposeFeatures();
@@ -710,9 +792,16 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 }
 
 function initExtension() {
-  if (!apiKey) return;
+  if (!apiKey || isInitializing) return;
+  isInitializing = true;
   
   console.log('tonegenie: Initializing...');
+  
+  // Cleanup existing observer if any
+  if (mainObserver) {
+    mainObserver.disconnect();
+    mainObserver = null;
+  }
   
   // Load generation count
   loadGenerationCount();
@@ -724,7 +813,7 @@ function initExtension() {
   initComposeFeatures();
   
   // Watch for new containers (like Whisper AI does)
-  const observer = new MutationObserver((mutations) => {
+  mainObserver = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
@@ -745,11 +834,12 @@ function initExtension() {
     });
   });
 
-  observer.observe(document.body, {
+  mainObserver.observe(document.body, {
     childList: true,
     subtree: true
   });
 
+  isInitializing = false;
   console.log('tonegenie: Observer started');
 }
 
@@ -886,20 +976,23 @@ function injectIntoContainer(container) {
     return;
   }
 
-  // Find reply button (same as Whisper AI)
+  // Find the tweet action row (reply button container)
   const replyButton = container.querySelector('[data-testid="reply"], [aria-label*="Reply"], [aria-label*="reply"]');
   
   if (!replyButton) {
     return;
   }
 
-  console.log('tonegenie: Found reply button in container');
-
-  // Find the row that contains the reply button (exactly like Whisper AI)
+  // Find the row that contains the reply button
   const row = replyButton.closest('div[role="group"]') || replyButton.parentElement;
   
   if (!row || !row.parentNode) {
     console.log('tonegenie: Could not find row or parent');
+    return;
+  }
+
+  // FINAL SAFETY: If the row already has buttons from a parent container's injection, abort.
+  if (row.parentNode.querySelector('.ai-comment-buttons')) {
     return;
   }
 
@@ -1146,7 +1239,13 @@ async function handleButtonClick(e, container, style) {
     return;
   }
 
+  if (containerGenerationLocks.get(container)) return;
+  containerGenerationLocks.set(container, true);
+
   const button = e.currentTarget;
+  if (button.dataset.generating === '1') return;
+  button.dataset.generating = '1';
+  button.disabled = true;
   const originalContent = button.innerHTML;
   
   // Loading state
@@ -1190,7 +1289,7 @@ async function handleButtonClick(e, container, style) {
     // Wait for reply box to appear and insert comment
     setTimeout(async () => {
       try {
-        await insertIntoTwitter('[data-testid="tweetTextarea_0"], div[contenteditable="true"][data-testid*="tweetTextarea"]', comment);
+        await insertIntoTwitter(null, comment);
         
         // Increment and update generation count
         incrementGenerationCount();
@@ -1199,6 +1298,9 @@ async function handleButtonClick(e, container, style) {
         setTimeout(() => {
           button.innerHTML = originalContent;
           button.style.cursor = 'pointer';
+          button.disabled = false;
+          button.dataset.generating = '0';
+          containerGenerationLocks.set(container, false);
         }, 2000);
       } catch (error) {
         console.error('tonegenie: Error inserting comment:', error);
@@ -1206,6 +1308,9 @@ async function handleButtonClick(e, container, style) {
         setTimeout(() => {
           button.innerHTML = originalContent;
           button.style.cursor = 'pointer';
+          button.disabled = false;
+          button.dataset.generating = '0';
+          containerGenerationLocks.set(container, false);
         }, 2000);
       }
     }, 500);
@@ -1227,6 +1332,9 @@ async function handleButtonClick(e, container, style) {
     setTimeout(() => {
       button.innerHTML = originalContent;
       button.style.cursor = 'pointer';
+      button.disabled = false;
+      button.dataset.generating = '0';
+      containerGenerationLocks.set(container, false);
     }, 3000);
   }
 }
@@ -1562,8 +1670,6 @@ Then write only the final comment. no quotes no explanations.`;
   // Start with best model, will automatically fallback if rate limited
   const initialModelData = getNextAvailableModel();
   
-  const personaInstruction = getActivePersonaInstruction(tweetText);
-
   const response = await fetchWithRetry(null, {
     method: 'POST',
     headers: {
@@ -1573,13 +1679,11 @@ Then write only the final comment. no quotes no explanations.`;
       messages: [
         {
             role: 'system',
-            content: `You are a real Twitter/X user writing short casual comments.${userPersona ? ' Your persona: ' + userPersona + '.' : ''}
+            content: `You are a real Twitter/X user writing short casual comments.
 
 CRITICAL: Return ONLY the final comment text. No conversational filler, no "Sure!", no "Here is a comment:", no intro/outro text.
 
 Write in sentence case (only capitalize the first letter of the first word). Keep punctuation to an absolute minimum. Sound like a real person texting, not an AI.
-
-${personaInstruction ? `\nPersona profile instructions:\n${personaInstruction}\n` : ''}
 
 Never use these AI writing patterns:
 - Banned words: testament, pivotal, landscape, tapestry, underscore, vibrant, delve, garner, crucial, foster, showcase, highlight, intricate, enduring, groundbreaking, nestled, breathtaking, transformative, seamless, robust, synergy, leverage, impactful, key (as adjective)
@@ -1675,10 +1779,9 @@ Avoid repetitive AI-style openings:
                              lowerComment.includes('messages:');
   const hasGenericAiOpening = /^(i love how|love how|this tweet just|this is giving|honestly this|gotta love|i love that they)\b/i.test(comment.trim());
   const hasTemplatePhrase = /\b(i love that they|left out the part|i get where you('|’)re coming from|i see where you('|’)re coming from)\b/i.test(comment);
-  const personaAvoidTerms = getActivePersonaAvoidTerms();
-  const hasPersonaAvoidPattern = personaAvoidTerms.some(term => term && lowerComment.includes(term));
+  const hasAiLoop = hasLoopingRepetition(comment);
 
-  if (comment.length > 500 || comment.length < 5 || isPromptRepetition || hasGenericAiOpening || hasTemplatePhrase || hasPersonaAvoidPattern) {
+  if (comment.length > 500 || comment.length < 5 || isPromptRepetition || hasGenericAiOpening || hasTemplatePhrase || hasAiLoop) {
     console.log('tonegenie: Quality check failed or prompt repeated, using fallback. Original:', comment.substring(0, 100) + '...');
     comment = NATURAL_FALLBACKS[Math.floor(Math.random() * NATURAL_FALLBACKS.length)];
   }
@@ -1690,55 +1793,106 @@ Avoid repetitive AI-style openings:
 }
 
 async function insertIntoTwitter(selector, text) {
-  let replyBox = null;
-  
-  if (selector) {
-    replyBox = await waitForElement(selector, 5000);
-  } else {
-    // If no selector provided, use the current compose textarea
-    replyBox = composeTextArea || document.querySelector('[data-testid="tweetTextarea_0"]') || 
-               document.querySelector('div[contenteditable="true"][data-testid*="tweetTextarea"]');
+  let replyBox = resolveReplyBox(selector);
+  if (!replyBox && selector) {
+    await waitForElement(selector, 5000);
+    replyBox = resolveReplyBox(selector);
   }
   
   if (!replyBox) {
-    throw new Error('Reply box not found');
+    console.error('tonegenie: Reply box not found');
+    return;
   }
 
-  const existingText = (replyBox.innerText || replyBox.textContent || '').trim();
-  const existingLen = Array.from(existingText).length;
-  const remainingChars = Math.max(0, MAX_COMMENT_CHARS - existingLen);
-  const textToInsert = clampCommentLength(text, remainingChars);
+  const normalizedTextToInsert = normalizeWhitespace(text);
+  if (!normalizedTextToInsert) return;
+
+  // 1. GLOBAL LOCK: Prevent identical text from being inserted anywhere on the page in rapid succession.
+  // This is the strongest defense against event-duplicate race conditions.
+  const now = Date.now();
+  if (globalLastInsertSig === normalizedTextToInsert && (now - globalLastInsertTime) < 5000) {
+    console.log('tonegenie: Global duplicate signature detected, skipping');
+    return;
+  }
+  if (!passesSharedInsertGuard(normalizedTextToInsert, now, 5000)) {
+    console.log('tonegenie: Shared duplicate guard detected, skipping');
+    return;
+  }
+
+  // 2. ELEMENT LOCK: Prevent overlapping async calls to the same element.
+  if (insertLocks.has(replyBox) && insertLocks.get(replyBox) === normalizedTextToInsert) {
+    console.log('tonegenie: Atomic insertion lock active for this text on this element');
+    return;
+  }
+
+  // Extra signature guard for delayed duplicate invocations on same compose box.
+  if (replyBox._tgLastInsertSig === normalizedTextToInsert && (now - (replyBox._tgLastInsertTime || 0)) < 15000) {
+    console.log('tonegenie: Recent same-signature insertion detected on element, skipping');
+    return;
+  }
+  
+  // Robust per-element time locking
+  const lastTime = replyBox._tgLastInsertTime || 0;
+  if (now - lastTime < 1500) {
+    console.log('tonegenie: Rapid insertion prevented on element');
+    return;
+  }
+
+  // Check current box content
+  const existingText = (replyBox.innerText || replyBox.textContent || '');
+  const normalizedExisting = normalizeWhitespace(existingText);
+
+  // 3. CONTENT CHECK: Already in box — absolutely bail
+  // We check for exact match or if it ends with the text to handle mentions better.
+  if (normalizedExisting.includes(normalizedTextToInsert)) {
+    console.log('tonegenie: Content already exists in box (includes), skipping');
+    return;
+  }
+
+  // Set locks immediately safely before any sync calls
+  replyBox._tgLastInsertTime = now;
+  globalLastInsertSig = normalizedTextToInsert;
+  globalLastInsertTime = now;
+  insertLocks.set(replyBox, normalizedTextToInsert);
+  markProgrammaticComposeWrite(replyBox, normalizedTextToInsert);
 
   replyBox.focus();
 
-  try {
-    document.execCommand('insertText', false, textToInsert);
-  } catch {
-    // Fallback methods
-    const cleanText = textToInsert.replace(/\s+$/, '');
-    try {
-      const dataTransfer = new DataTransfer();
-      dataTransfer.setData('text/plain', cleanText);
-      dataTransfer.setData('text/html', cleanText.replace(/\n/g, '<br>'));
-      
-      const pasteEvent = new ClipboardEvent('paste', {
-        bubbles: true,
-        cancelable: true,
-        clipboardData: dataTransfer
-      });
-      
-      replyBox.dispatchEvent(pasteEvent);
-      replyBox.dispatchEvent(new InputEvent('input', {
-        bubbles: true,
-        inputType: 'insertFromPaste'
-      }));
-    } catch {
-      replyBox.innerHTML = textToInsert;
-      replyBox.dispatchEvent(new Event('input', {
-        bubbles: true
-      }));
-    }
+  // Use a single deterministic write to avoid X editor desync/ghost overlays.
+  const spacer = (normalizedExisting && !normalizedExisting.endsWith(' ') && !normalizedExisting.endsWith('\n')) ? ' ' : '';
+  const desiredFullText = `${existingText}${spacer}${text}`;
+  const normalizedDesired = normalizeWhitespace(desiredFullText);
+  if (!normalizedDesired) return;
+
+  document.execCommand('selectAll', false, null);
+  const success = document.execCommand('insertText', false, desiredFullText);
+  await new Promise(resolve => setTimeout(resolve, 60));
+  let postExecText = normalizeWhitespace(replyBox.innerText || replyBox.textContent || '');
+  let insertedAfterExec = postExecText === normalizedDesired;
+
+  if (!success && !insertedAfterExec) {
+    // X can occasionally return false even when insertText is available; do one controlled retry only.
+    document.execCommand('selectAll', false, null);
+    const retrySuccess = document.execCommand('insertText', false, desiredFullText);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    postExecText = normalizeWhitespace(replyBox.innerText || replyBox.textContent || '');
+    insertedAfterExec = retrySuccess || postExecText === normalizedDesired;
   }
+
+  if (success || insertedAfterExec) {
+    dedupeInsertedTextIfRepeated(replyBox, desiredFullText);
+    replyBox._tgLastInsertSig = normalizedTextToInsert;
+    console.log('tonegenie: Content inserted successfully');
+  } else {
+    console.warn('tonegenie: insertText did not apply content, skipping unsafe fallback');
+  }
+
+  // Release atomic element lock after a short delay to allow DOM to settle
+  setTimeout(() => {
+    if (insertLocks.get(replyBox) === normalizedTextToInsert) {
+      insertLocks.delete(replyBox);
+    }
+  }, 1000);
 }
 
 function waitForElement(selector, timeout = 5000) {
@@ -1838,6 +1992,7 @@ function initComposeFeatures() {
   // Watch for compose box appearance
   if (!composeObserver) {
     composeObserver = new MutationObserver(() => {
+      if (isComposeMutationHandlingPaused()) return;
       findAndInjectHashtagWidget();
     });
     
@@ -1850,19 +2005,7 @@ function initComposeFeatures() {
 
 function findAndInjectHashtagWidget() {
   // Find compose textarea
-  const composeSelectors = [
-    '[data-testid="tweetTextarea_0"]',
-    'div[contenteditable="true"][data-testid*="tweetTextarea"]',
-    '[data-testid="tweetTextarea_0"] ~ div',
-    '[aria-label*="What\'s happening"]',
-    '[contenteditable="true"][aria-label*="Tweet"]'
-  ];
-  
-  let foundTextarea = null;
-  for (const selector of composeSelectors) {
-    foundTextarea = document.querySelector(selector);
-    if (foundTextarea) break;
-  }
+  const foundTextarea = getActiveComposeTextArea();
   
   if (!foundTextarea) {
     // Clean up if compose box is closed
@@ -1965,6 +2108,8 @@ function getTrendingHashtags() {
 
 async function updateHashtagSuggestions(tweetText) {
   if (!hashtagWidget || !apiKey) return;
+  const targetWidget = hashtagWidget;
+  if (!targetWidget || !document.contains(targetWidget)) return;
   
   // Get trending hashtags
   const trending = await getTrendingHashtags();
@@ -1978,15 +2123,20 @@ async function updateHashtagSuggestions(tweetText) {
       console.error('Error generating hashtags:', error);
     }
   }
+
+  // Widget may have been removed while awaiting async work.
+  if (!hashtagWidget || hashtagWidget !== targetWidget || !document.contains(targetWidget)) {
+    return;
+  }
   
   // Combine and deduplicate
   const allHashtags = [...new Set([...relevantHashtags, ...trending])].slice(0, 8);
   
   // Update widget
-  hashtagWidget.innerHTML = '';
+  targetWidget.innerHTML = '';
   
   if (allHashtags.length === 0) {
-    hashtagWidget.innerHTML = '<div style="font-size: 12px; color: #666; padding: 4px;">Loading hashtags...</div>';
+    targetWidget.innerHTML = '<div style="font-size: 12px; color: #666; padding: 4px;">Loading hashtags...</div>';
     return;
   }
   
@@ -2019,7 +2169,7 @@ async function updateHashtagSuggestions(tweetText) {
       insertHashtag(hashtag);
     });
     
-    hashtagWidget.appendChild(tagBtn);
+    targetWidget.appendChild(tagBtn);
   });
 }
 
@@ -2087,15 +2237,9 @@ async function insertContentIntoCompose(content) {
   }
   
   // Find compose textarea
-  const composeSelectors = [
-    '[data-testid="tweetTextarea_0"]',
-    'div[contenteditable="true"][data-testid*="tweetTextarea"]'
-  ];
-  
-  let textarea = null;
-  for (const selector of composeSelectors) {
-    textarea = await waitForElement(selector, 3000);
-    if (textarea) break;
+  let textarea = getActiveComposeTextArea();
+  if (!textarea) {
+    textarea = await waitForElement('[data-testid="tweetTextarea_0"][contenteditable="true"], div[contenteditable="true"][role="textbox"][data-testid*="tweetTextarea"]', 3000);
   }
   
   if (!textarea) {
@@ -2422,6 +2566,8 @@ async function handleQuickReply(container, tweetText, button) {
   if (!apiKey || !tweetText) {
     return;
   }
+  if (containerGenerationLocks.get(container)) return;
+  containerGenerationLocks.set(container, true);
   
   const originalText = button.textContent;
   button.disabled = true;
@@ -2458,7 +2604,7 @@ async function handleQuickReply(container, tweetText, button) {
       // Wait and insert comment
       setTimeout(async () => {
         try {
-          await insertIntoTwitter('[data-testid="tweetTextarea_0"], div[contenteditable="true"][data-testid*="tweetTextarea"]', comment);
+          await insertIntoTwitter(null, comment);
           
           // Increment and update generation count
           incrementGenerationCount();
@@ -2469,21 +2615,25 @@ async function handleQuickReply(container, tweetText, button) {
             button.disabled = false;
             button.textContent = originalText;
             button.style.background = '';
+            containerGenerationLocks.set(container, false);
           }, 2000);
         } catch (error) {
           console.error('tonegenie: Error inserting quick reply:', error);
           button.textContent = 'Retry';
           button.disabled = false;
+          containerGenerationLocks.set(container, false);
         }
       }, 500);
     } else {
       button.textContent = 'Tweet not found';
       button.disabled = false;
+      containerGenerationLocks.set(container, false);
     }
   } catch (error) {
     console.error('tonegenie: Error generating quick reply:', error);
     button.textContent = 'Error';
     button.disabled = false;
+    containerGenerationLocks.set(container, false);
   }
 }
 
