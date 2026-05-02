@@ -1,14 +1,6 @@
 ﻿let apiKey = null;
 let openRouterKey = null;
 let generationCount = 0;
-let usageTrackingInitialized = false;
-let usageSessionStart = null;
-let usageHeartbeatInterval = null;
-let usageWidget = null;
-let usageWidgetInterval = null;
-let usageCurrentDayKey = formatUsageDateKey();
-let usageTodayMsCache = 0;
-let usageCacheLoaded = false;
 const recentInsertions = new WeakMap();
 const insertLocks = new WeakMap();
 const containerGenerationLocks = new WeakMap();
@@ -147,216 +139,6 @@ function dedupeInsertedTextIfRepeated(replyBox, expectedText) {
 
   replyBox.dispatchEvent(new InputEvent('input', { bubbles: true }));
   return true;
-}
-
-function formatUsageDateKey(dateInput = new Date()) {
-  const date = new Date(dateInput);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatDurationCompact(ms) {
-  const totalSeconds = Math.floor((ms || 0) / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
-async function addUsageRange(startMs, endMs = Date.now()) {
-  if (!startMs || !endMs || endMs <= startMs) return;
-  try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
-      const data = await chrome.storage.local.get(['xDailyUsageMs']);
-      const usage = data.xDailyUsageMs || {};
-
-      let cursor = startMs;
-      while (cursor < endMs) {
-        const cursorDate = new Date(cursor);
-        const nextDayStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), cursorDate.getDate() + 1).getTime();
-        const segmentEnd = Math.min(endMs, nextDayStart);
-        const delta = segmentEnd - cursor;
-        const dayKey = formatUsageDateKey(cursorDate);
-        usage[dayKey] = (usage[dayKey] || 0) + delta;
-        cursor = segmentEnd;
-      }
-
-      await chrome.storage.local.set({ xDailyUsageMs: usage });
-    }
-  } catch (e) {
-    if (e.message?.includes('Extension context invalidated')) return;
-    console.error('tonegenie: Error saving X usage time:', e);
-  }
-}
-
-function addRangeToTodayCache(startMs, endMs) {
-  if (!startMs || !endMs || endMs <= startMs) return;
-  let cursor = startMs;
-  while (cursor < endMs) {
-    const cursorDate = new Date(cursor);
-    const nextDayStart = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), cursorDate.getDate() + 1).getTime();
-    const segmentEnd = Math.min(endMs, nextDayStart);
-    const delta = segmentEnd - cursor;
-    const dayKey = formatUsageDateKey(cursorDate);
-    if (dayKey === usageCurrentDayKey) {
-      usageTodayMsCache += delta;
-    }
-    cursor = segmentEnd;
-  }
-}
-
-function getTodayStartMs(now = Date.now()) {
-  const d = new Date(now);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-function rolloverUsageDayIfNeeded(now = Date.now()) {
-  const currentKey = formatUsageDateKey(new Date(now));
-  if (currentKey === usageCurrentDayKey) return;
-
-  // Persist the carried-over session time into the previous day before resetting.
-  if (usageSessionStart && usageSessionStart < now) {
-    const todayStart = getTodayStartMs(now);
-    const splitPoint = Math.min(todayStart, now);
-    if (splitPoint > usageSessionStart) {
-      addRangeToTodayCache(usageSessionStart, splitPoint);
-      addUsageRange(usageSessionStart, splitPoint);
-    }
-    usageSessionStart = splitPoint < now ? splitPoint : now;
-  }
-
-  usageCurrentDayKey = currentKey;
-  usageTodayMsCache = 0;
-}
-
-function recordUsageRange(startMs, endMs = Date.now()) {
-  if (!startMs || !endMs || endMs <= startMs) return;
-  addRangeToTodayCache(startMs, endMs);
-  addUsageRange(startMs, endMs);
-}
-
-async function loadTodayUsageCache() {
-  try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
-      const data = await chrome.storage.local.get(['xDailyUsageMs']);
-      const usage = data.xDailyUsageMs || {};
-      usageCurrentDayKey = formatUsageDateKey();
-      usageTodayMsCache = usage[usageCurrentDayKey] || 0;
-      usageCacheLoaded = true;
-    }
-  } catch (e) {
-    if (e.message?.includes('Extension context invalidated')) return;
-    console.error('tonegenie: Error loading X usage cache:', e);
-  }
-}
-
-function stopUsageTimer() {
-  if (!usageSessionStart) return;
-  const start = usageSessionStart;
-  usageSessionStart = null;
-  const now = Date.now();
-  rolloverUsageDayIfNeeded(now);
-  recordUsageRange(start, now);
-}
-
-function startUsageTimer() {
-  if (usageSessionStart) return;
-  usageSessionStart = Date.now();
-}
-
-function isXTabActivelyViewed() {
-  return document.visibilityState === 'visible' && document.hasFocus();
-}
-
-function updateUsageTimerState() {
-  if (isXTabActivelyViewed()) {
-    startUsageTimer();
-  } else {
-    stopUsageTimer();
-  }
-}
-
-function initUsageTracking() {
-  if (usageTrackingInitialized) return;
-  usageTrackingInitialized = true;
-
-  updateUsageTimerState();
-  document.addEventListener('visibilitychange', updateUsageTimerState);
-  window.addEventListener('focus', updateUsageTimerState);
-  window.addEventListener('blur', updateUsageTimerState);
-  window.addEventListener('beforeunload', stopUsageTimer);
-  window.addEventListener('pagehide', stopUsageTimer);
-
-  // Flush active time every 15s so usage survives tab/browser crashes.
-  usageHeartbeatInterval = setInterval(() => {
-    if (!usageSessionStart) return;
-    const now = Date.now();
-    rolloverUsageDayIfNeeded(now);
-    const elapsed = now - usageSessionStart;
-    if (elapsed >= 1000) {
-      const start = usageSessionStart;
-      usageSessionStart = now;
-      recordUsageRange(start, now);
-    }
-  }, 15000);
-}
-
-function ensureUsageWidget() {
-  if (usageWidget || !document.body) return;
-  usageWidget = document.createElement('div');
-  usageWidget.id = 'tonegenie-usage-widget';
-  usageWidget.style.cssText = `
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    z-index: 999996;
-    background: rgba(15, 23, 42, 0.9);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    padding: 8px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
-    pointer-events: none;
-  `;
-  usageWidget.textContent = 'Today on X: 0s';
-  document.body.appendChild(usageWidget);
-}
-
-async function updateUsageWidgetText() {
-  if (!usageWidget) return;
-  const now = Date.now();
-  rolloverUsageDayIfNeeded(now);
-
-  if (!usageCacheLoaded) {
-    await loadTodayUsageCache();
-  }
-
-  try {
-    let todayMs = usageTodayMsCache;
-    if (usageSessionStart) {
-      const activeStart = Math.max(usageSessionStart, getTodayStartMs(now));
-      todayMs += Math.max(0, now - activeStart);
-    }
-    usageWidget.textContent = `Today on X: ${formatDurationCompact(todayMs)}`;
-  } catch {
-    // ignore transient storage errors
-  }
-}
-
-function initUsageWidget() {
-  ensureUsageWidget();
-  loadTodayUsageCache().finally(() => updateUsageWidgetText());
-  if (usageWidgetInterval) clearInterval(usageWidgetInterval);
-  usageWidgetInterval = setInterval(updateUsageWidgetText, 1000);
 }
 
 // Load generation count from storage
@@ -520,6 +302,224 @@ function hasLoopingRepetition(text) {
   // Detect low lexical variety in long text
   const uniqueRatio = new Set(words).size / words.length;
   return words.length >= 40 && uniqueRatio < 0.38;
+}
+
+function straightenQuotesAndDashes(text) {
+  if (!text) return '';
+  return text
+    .toString()
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-');
+}
+
+function stripChatbotCorrespondence(text) {
+  if (!text) return '';
+  let out = text.toString().trim();
+  out = out.replace(/^(great question|good question|sure|certainly|of course|absolutely)[!.:,]?\s+/i, '');
+  out = out.replace(/\b(i hope this helps|let me know if you('d)? like|here('s| is) (a|an|the))\b.*$/i, '');
+  return out.trim();
+}
+
+function mergeChoppyMicroSentences(text) {
+  const raw = (text || '').toString().trim();
+  if (!raw) return '';
+
+  // Split on sentence-ending punctuation while keeping it simple for short social replies.
+  const parts = raw.split(/(?<=[.!?])\s+/).map(p => p.trim()).filter(Boolean);
+  if (parts.length < 3) return raw;
+
+  const wordCount = (s) => normalizeWhitespace(s).split(' ').filter(Boolean).length;
+  const merged = [];
+  let i = 0;
+  while (i < parts.length) {
+    const a = parts[i];
+    const b = parts[i + 1];
+    const c = parts[i + 2];
+    if (b && c && wordCount(a) < 6 && wordCount(b) < 6 && wordCount(c) < 6) {
+      merged.push(`${a.replace(/[.!?]+$/g, '')} ${b.replace(/[.!?]+$/g, '')} ${c}`.trim());
+      i += 3;
+      continue;
+    }
+    merged.push(a);
+    i += 1;
+  }
+  return merged.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function commentHasAiTellSignals(text) {
+  const t = normalizeWhitespace(text).toLowerCase();
+  if (!t) return false;
+
+  const bannedPhrases = [
+    'as a large language model',
+    'based on available information',
+    'while specific details',
+    'industry observers',
+    'experts argue',
+    'some critics argue',
+    'observers have',
+    'independent coverage',
+    'national media outlets',
+    'written by a leading expert',
+    'featured in',
+    'in today\'s rapidly evolving',
+    'rapidly evolving',
+    'exciting times lie ahead',
+    'the future looks bright',
+    'hope this helps',
+    'let me know',
+    'moreover',
+    'furthermore',
+    'additionally',
+    'it\'s worth noting',
+    'it is worth noting',
+    'needless to say',
+    'at the end of the day',
+    'here is an',
+    'here\'s an',
+    'unpack',
+    'dive into',
+    'leverage',
+    'synergy',
+    'paradigm shift',
+    'game-changer',
+    'game changer',
+    'watershed moment',
+    'holistic',
+    'actionable',
+    'nestled',
+    'breathtaking',
+    'groundbreaking',
+    'transformative',
+    'underscores',
+    'highlights the importance',
+    'serves as a',
+    'stands as a',
+    'marks a pivotal',
+    'testament to',
+    'tapestry',
+    'intricate interplay',
+    'foster alignment',
+    'it is important to note',
+    'in order to',
+    'at this point in time',
+    'could potentially',
+    'might perhaps'
+  ];
+
+  if (bannedPhrases.some(p => t.includes(p))) return true;
+
+  const bannedWords = [
+    'testament',
+    'pivotal',
+    'landscape',
+    'tapestry',
+    'underscore',
+    'vibrant',
+    'delve',
+    'garner',
+    'crucial',
+    'foster',
+    'showcase',
+    'intricate',
+    'enduring',
+    'groundbreaking',
+    'transformative',
+    'seamless',
+    'robust',
+    'synergy',
+    'leverage',
+    'impactful',
+    'holistic',
+    'unpack',
+    'navigate',
+    'journey',
+    'resonate',
+    'ecosystem'
+  ];
+
+  const tokens = t.match(/[a-z]{3,}/g) || [];
+  if (tokens.some(tok => bannedWords.includes(tok))) return true;
+
+  // Machine-gun micro-sentences: 3+ consecutive segments under 6 words (split on whitespace chunks).
+  const chunks = t.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+  let run = 0;
+  for (const chunk of chunks) {
+    const wc = chunk.split(/\s+/).filter(Boolean).length;
+    if (wc > 0 && wc < 6) run++;
+    else run = 0;
+    if (run >= 3) return true;
+  }
+
+  return false;
+}
+
+function humanizeCommentSurface(text) {
+  let out = straightenQuotesAndDashes(text);
+  out = stripChatbotCorrespondence(out);
+  out = mergeChoppyMicroSentences(out);
+  return normalizeWhitespace(out);
+}
+
+async function rewriteCommentToRemoveAiTells(draftComment, tweetText, uiHooks = {}) {
+  const tweetSnippet = normalizeWhitespace((tweetText || '').toString()).slice(0, 220);
+  const draftSnippet = normalizeWhitespace((draftComment || '').toString()).slice(0, 220);
+
+  const revisionUserPrompt = `You are editing a short Twitter/X reply.
+
+Tweet (context): "${tweetSnippet}"
+
+Draft reply (may sound AI-ish): "${draftSnippet}"
+
+Rewrite into ONE final reply only.
+Hard requirements:
+- ${MAX_COMMENT_CHARS} characters max
+- sentence case (only first letter capitalized)
+- minimal punctuation
+- sound like a real person texting
+- keep the same meaning/intent as the draft
+- do not add new facts, stats, names, studies, or citations
+- avoid Wikipedia/press-release tone
+- avoid collaborative chatbot language ("hope this helps", "let me know", "great question")
+- avoid significance puffery and vague attributions
+- vary rhythm: not all micro-sentences; not all same-length sentences
+- no emojis unless the tweet clearly expects one (rare)
+
+Return ONLY the final reply text.`;
+
+  const initialModelData = getNextAvailableModel();
+  const response = await fetchWithRetry(null, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: 'system',
+          content: `You rewrite short Twitter/X replies to remove obvious AI-generated tells while keeping the same meaning.
+
+Hard bans:
+- No collaborative chatbot language ("great question", "hope this helps", "let me know", "here is")
+- No significance inflation / press-release tone (pivotal, testament, landscape, tapestry, underscores, transformative, groundbreaking, vibrant, holistic, synergy, ecosystem)
+- No vague authority claims ("experts say", "industry reports", "observers note", "featured in", "independent coverage")
+- No filler hedges ("moreover", "furthermore", "additionally", "in order to", "at the end of the day", "it is important to note")
+- No fake depth -ing tails ("highlighting...", "reflecting...", "contributing to...")
+- No negative parallelism ("not just x it's y")
+- No machine-gun micro-sentence chains; vary rhythm
+- No emojis unless clearly required by the tweet itself
+
+Return ONLY the final reply text. No quotes. No explanations.`
+        },
+        { role: 'user', content: revisionUserPrompt }
+      ],
+      temperature: 0.55,
+      max_tokens: 120,
+      top_p: 1
+    })
+  }, 2, initialModelData, uiHooks.onRateLimitStatus);
+
+  const data = await response.json();
+  return (data.choices?.[0]?.message?.content || '').trim();
 }
 
 function getMixedStyle(primaryStyle, tweetText) {
@@ -843,16 +843,6 @@ function initExtension() {
   console.log('tonegenie: Observer started');
 }
 
-// Usage tracking/widget should run regardless of API key status.
-if (typeof window !== 'undefined') {
-  initUsageTracking();
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initUsageWidget, { once: true });
-  } else {
-    initUsageWidget();
-  }
-}
-
 function scanAndInject() {
   if (!apiKey) return;
   
@@ -973,6 +963,12 @@ Return ONLY the JSON array, nothing else.`;
 
 function injectIntoContainer(container) {
   if (!container || container.querySelector('.ai-comment-buttons')) {
+    return;
+  }
+
+  // Never inject action buttons inside X compose/reply dialogs.
+  // Modal controls (close/back) must remain fully native.
+  if (container.closest('[role="dialog"]')) {
     return;
   }
 
@@ -1121,6 +1117,7 @@ function injectIntoContainer(container) {
   Object.entries(buttonStyles).forEach(([style, { emoji, text }]) => {
     const button = document.createElement('button');
     button.className = 'ai-style-btn';
+    button.type = 'button';
     button.dataset.style = style;
     
     // Set initial style (will be updated if suggested)
@@ -1167,8 +1164,6 @@ function injectIntoContainer(container) {
 
     // Click handler
     button.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
       await handleButtonClick(e, container, style);
     });
 
@@ -1686,7 +1681,7 @@ CRITICAL: Return ONLY the final comment text. No conversational filler, no "Sure
 Write in sentence case (only capitalize the first letter of the first word). Keep punctuation to an absolute minimum. Sound like a real person texting, not an AI.
 
 Never use these AI writing patterns:
-- Banned words: testament, pivotal, landscape, tapestry, underscore, vibrant, delve, garner, crucial, foster, showcase, highlight, intricate, enduring, groundbreaking, nestled, breathtaking, transformative, seamless, robust, synergy, leverage, impactful, key (as adjective)
+- Banned words: testament, pivotal, landscape, tapestry, underscore, vibrant, delve, garner, crucial, foster, showcase, highlight, intricate, enduring, groundbreaking, nestled, breathtaking, transformative, seamless, robust, synergy, leverage, impactful, holistic, navigate, journey, resonate, ecosystem, paradigm, unpack, actionable, moreover, furthermore, additionally, key (as adjective)
 - No em dashes — use commas or short sentences instead
 - No bold text
 - No rule-of-three lists (x y and z)
@@ -1694,12 +1689,16 @@ Never use these AI writing patterns:
 - No -ing analysis phrases (highlighting, underscoring, showcasing, symbolizing, reflecting, contributing to)
 - No promotional adjectives (breathtaking, vibrant, groundbreaking)
 - No vague attributions (experts say, industry reports, observers note)
+- No notability flex (featured in major outlets, independent coverage, written by a leading expert)
+- No significance puffery (pivotal moment, enduring legacy, broader trends, sets the stage)
 - No copula avoidance — write is not serves as or stands as
 - No generic happy endings (the future looks bright, exciting times ahead)
 - No filler (in order to, at this point in time, it is important to note)
 - No over-hedging (could potentially possibly, might perhaps)
 - No sycophantic openers (great question, absolutely, of course)
 - No chatbot closers (hope this helps, let me know)
+- No outline-y labels like "User experience:" with a colon then a sentence
+- No title case headings
 
 Do add real personality:
 - Vary sentence length — mix short punchy and longer flowing
@@ -1725,20 +1724,7 @@ Avoid repetitive AI-style openings:
 
   const data = await response.json();
   let comment = data.choices[0].message.content.trim();
-  
-  // Extract text inside quotes if the model says "likely saying something like '...'"
-  const quoteMatch = comment.match(/(?:likely saying something like|respond with|saying)\s*["']([^"']{10,})["']/i);
-  if (quoteMatch && quoteMatch[1]) {
-    console.log('tonegenie: Extracted comment from conversational filler');
-    comment = quoteMatch[1];
-  }
 
-  // Clean up the response - remove quotes, prefixes, and any common AI filler
-  comment = comment.replace(/^["'](.*)["']$/s, '$1');
-  comment = comment.replace(/^(comment|response|reply|certainly|sure|here is|here's|i would|ok|okay|crafting):\s*/i, '');
-  comment = comment.replace(/^system prompt:/i, '');
-  
-  // even more aggressive stripping of prompt instructions/echoes
   const promptPatterns = [
     /^we need to (analyze|output|write|generate|craft).*$/im,
     /^tweet:.*$/im,
@@ -1753,6 +1739,18 @@ Avoid repetitive AI-style openings:
     /^must be polite.*$/im,
     /^avoid exclamation.*$/im
   ];
+  
+  // Extract text inside quotes if the model says "likely saying something like '...'"
+  const quoteMatch = comment.match(/(?:likely saying something like|respond with|saying)\s*["']([^"']{10,})["']/i);
+  if (quoteMatch && quoteMatch[1]) {
+    console.log('tonegenie: Extracted comment from conversational filler');
+    comment = quoteMatch[1];
+  }
+
+  // Clean up the response - remove quotes, prefixes, and any common AI filler
+  comment = comment.replace(/^["'](.*)["']$/s, '$1');
+  comment = comment.replace(/^(comment|response|reply|certainly|sure|here is|here's|i would|ok|okay|crafting):\s*/i, '');
+  comment = comment.replace(/^system prompt:/i, '');
   
   let lines = comment.split('\n');
   lines = lines.filter(line => {
@@ -1769,6 +1767,43 @@ Avoid repetitive AI-style openings:
     const lastPara = paragraphs[paragraphs.length - 1].trim();
     if (lastPara.length > 20 && lastPara.length < 250) {
       comment = lastPara;
+    }
+  }
+
+  // Humanizer pass: cheap local cleanup + optional model rewrite if obvious AI tells remain.
+  const originalComment = comment;
+  comment = humanizeCommentSurface(comment);
+  if (commentHasAiTellSignals(comment)) {
+    try {
+      const revised = await rewriteCommentToRemoveAiTells(comment, tweetText, uiHooks);
+      if (revised && revised.length >= 5) {
+        comment = revised;
+        // Re-apply the same lightweight cleanup pipeline on the revision.
+        comment = comment.replace(/^["'](.*)["']$/s, '$1');
+        comment = comment.replace(/^(comment|response|reply|certainly|sure|here is|here's|i would|ok|okay|crafting):\s*/i, '');
+        comment = comment.replace(/^system prompt:/i, '');
+
+        let revisedLines = comment.split('\n');
+        revisedLines = revisedLines.filter(line => {
+          const trimmed = line.trim().toLowerCase();
+          if (!trimmed) return true;
+          return !promptPatterns.some(pattern => pattern.test(trimmed));
+        });
+        comment = revisedLines.join('\n').trim();
+
+        if (comment.length > 400 && comment.includes('\n\n')) {
+          const paragraphs = comment.split('\n\n');
+          const lastPara = paragraphs[paragraphs.length - 1].trim();
+          if (lastPara.length > 20 && lastPara.length < 250) {
+            comment = lastPara;
+          }
+        }
+
+        comment = humanizeCommentSurface(comment);
+      }
+    } catch (e) {
+      console.log('tonegenie: Humanizer rewrite skipped:', e?.message || e);
+      comment = originalComment;
     }
   }
 
@@ -2143,6 +2178,7 @@ async function updateHashtagSuggestions(tweetText) {
   allHashtags.forEach(hashtag => {
     const tagBtn = document.createElement('button');
     tagBtn.className = 'tonegenie-hashtag-btn';
+    tagBtn.type = 'button';
     tagBtn.textContent = hashtag;
     tagBtn.style.cssText = `
       background: rgba(29, 155, 240, 0.1);
@@ -2264,428 +2300,6 @@ async function insertContentIntoCompose(content) {
   }
 }
 
-// ==================== FIRST REPLY DETECTOR ====================
-
-// Track processed tweets to avoid duplicate alerts
-const processedTweets = new Set();
-
-// Store early reply opportunities
-const earlyReplyOpportunities = new Map(); // tweetId -> { container, opportunity, tweetText, username }
-
-let currentFilter = 'all'; // 'all', 'high', 'medium'
-
-// High value accounts
-const highValueAccounts = new Map(); // username -> { username, followerCount, engagementRate, lastTweetTime, lastTweetUrl, lastTweetText, container }
-
-// Extract tweet timestamp from container
-function getTweetTimestamp(container) {
-  // Try multiple selectors for timestamp
-  const timeSelectors = [
-    'time[datetime]',
-    'a[href*="/status/"] time',
-    '[data-testid="User-Name"] time',
-    'time',
-    'a[href*="/status/"] span'
-  ];
-  
-  for (const selector of timeSelectors) {
-    const timeElement = container.querySelector(selector);
-    if (timeElement) {
-      // Try datetime attribute first
-      const datetime = timeElement.getAttribute('datetime');
-      if (datetime) {
-        const date = new Date(datetime);
-        if (!isNaN(date.getTime())) {
-          return date.getTime();
-        }
-      }
-      
-      // Try parsing title attribute
-      const title = timeElement.getAttribute('title');
-      if (title) {
-        const date = new Date(title);
-        if (!isNaN(date.getTime())) {
-          return date.getTime();
-        }
-      }
-      
-      // Try parsing text content (e.g., "2h", "5m", "Just now")
-      const text = timeElement.textContent?.trim() || '';
-      const timeAgo = parseTimeAgo(text);
-      if (timeAgo !== null) {
-        return Date.now() - timeAgo;
-      }
-    }
-  }
-  
-  return null;
-}
-
-// Parse relative time strings like "2h", "5m", "Just now"
-function parseTimeAgo(text) {
-  if (!text) return null;
-  
-  text = text.toLowerCase().trim();
-  
-  // "Just now" or "now"
-  if (text.includes('now') || text === '') {
-    return 0;
-  }
-  
-  // Parse patterns like "2h", "5m", "30s", "1d"
-  const patterns = [
-    { regex: /(\d+)\s*s(?:ec(?:ond)?s?)?/i, multiplier: 1000 },
-    { regex: /(\d+)\s*m(?:in(?:ute)?s?)?/i, multiplier: 60 * 1000 },
-    { regex: /(\d+)\s*h(?:our)?s?/i, multiplier: 60 * 60 * 1000 },
-    { regex: /(\d+)\s*d(?:ay)?s?/i, multiplier: 24 * 60 * 60 * 1000 },
-    { regex: /(\d+)\s*w(?:eek)?s?/i, multiplier: 7 * 24 * 60 * 60 * 1000 }
-  ];
-  
-  for (const pattern of patterns) {
-    const match = text.match(pattern.regex);
-    if (match) {
-      return parseInt(match[1]) * pattern.multiplier;
-    }
-  }
-  
-  return null;
-}
-
-// Extract reply count from tweet container
-function getReplyCount(container) {
-  const replySelectors = [
-    '[data-testid="reply"]',
-    '[aria-label*="Reply"]',
-    'button[aria-label*="reply" i]'
-  ];
-  
-  for (const selector of replySelectors) {
-    const replyButton = container.querySelector(selector);
-    if (replyButton) {
-      // Method 1: Get from aria-label (most reliable)
-      const ariaLabel = replyButton.getAttribute('aria-label') || '';
-      const match = ariaLabel.match(/(\d+)\s*(?:reply|replies)/i);
-      if (match) {
-        return parseInt(match[1]);
-      }
-      
-      // Method 2: Find count in nested spans (Twitter's structure)
-      const allSpans = replyButton.querySelectorAll('span');
-      for (const span of allSpans) {
-        const text = span.textContent?.trim();
-        // Check if it's a number (but not too large to be a timestamp)
-        if (text && /^\d+$/.test(text)) {
-          const num = parseInt(text);
-          // Reasonable range for reply count (0 to 10M)
-          if (num >= 0 && num < 10000000) {
-            // Make sure it's not part of a date/time
-            const parentText = span.parentElement?.textContent || '';
-            if (!parentText.match(/\d+\s*(h|m|s|d|w)/i)) {
-              return num;
-            }
-          }
-        }
-      }
-      
-      // Method 3: Check parent container for count
-      const parent = replyButton.closest('div[role="group"]') || replyButton.parentElement;
-      if (parent) {
-        const text = parent.textContent || '';
-        // Look for numbers near "reply" text
-        const replyMatch = text.match(/(\d+)\s*(?:reply|replies?)/i);
-        if (replyMatch) {
-          return parseInt(replyMatch[1]);
-        }
-      }
-    }
-  }
-  
-  // Default: assume 0 replies if we can't find it
-  return 0;
-}
-
-// Extract follower count from account
-function getFollowerCount(container) {
-  // Try to find user info link
-  const userLink = container.querySelector('a[href*="/"][role="link"]');
-  if (!userLink) return null;
-  
-  // Try to find follower count in profile link or hover card
-  // This is tricky - Twitter doesn't always show follower count in tweet
-  // We'll use a heuristic: check if user has verified badge (often indicates higher followers)
-  const verifiedBadge = container.querySelector('[data-testid="icon-verified"]');
-  
-  // If we can't find exact count, we'll estimate based on other signals
-  // For now, return null and we'll use other heuristics
-  return null;
-}
-
-// Check if tweet is an early reply opportunity
-function isEarlyReplyOpportunity(container) {
-  // Generate stable tweet ID from URL or data attributes
-  let tweetId = null;
-  
-  // Try to get tweet URL
-  const tweetLink = container.querySelector('a[href*="/status/"]');
-  if (tweetLink) {
-    const href = tweetLink.getAttribute('href');
-    const match = href.match(/\/status\/(\d+)/);
-    if (match) {
-      tweetId = match[1];
-    }
-  }
-  
-  // Fallback to data-testid or container ID
-  if (!tweetId) {
-    tweetId = container.getAttribute('data-testid') || 
-              container.querySelector('article')?.getAttribute('data-testid') ||
-              container.id ||
-              `tweet-${container.querySelector('[data-testid="tweetText"]')?.textContent?.substring(0, 50)?.replace(/\s+/g, '-') || 'unknown'}`;
-  }
-  
-  // Skip if already processed
-  if (processedTweets.has(tweetId)) {
-    return null;
-  }
-  
-  const timestamp = getTweetTimestamp(container);
-  const replyCount = getReplyCount(container);
-  
-  if (timestamp === null) {
-    return null;
-  }
-  
-  const ageMs = Date.now() - timestamp;
-  const ageMinutes = ageMs / (60 * 1000);
-  const ageHours = ageMs / (60 * 60 * 1000);
-  
-  // Early reply criteria:
-  // 1. Tweet is less than 30 minutes old AND has less than 100 replies = FAST REPLY opportunity
-  // 2. Tweet is less than 2 hours old AND has 10-500 replies = GOOD TIMING opportunity
-  // 3. Tweet is less than 24 hours old AND has 100-1000 replies = VIRAL opportunity
-  
-  let opportunity = null;
-  
-  if (ageMinutes < 30 && replyCount < 100) {
-    opportunity = {
-      type: 'fast_reply',
-      urgency: 'high',
-      message: `⚡ FAST REPLY — ${Math.round(ageMinutes)}m old, ${replyCount} replies`,
-      ageMinutes: Math.round(ageMinutes),
-      replyCount: replyCount
-    };
-  } else if (ageHours < 2 && replyCount >= 10 && replyCount < 500) {
-    opportunity = {
-      type: 'good_timing',
-      urgency: 'medium',
-      message: `🔥 Early opportunity — ${ageHours < 1 ? Math.round(ageMinutes) + 'm' : Math.round(ageHours) + 'h'} old, ${replyCount} replies`,
-      ageMinutes: Math.round(ageMinutes),
-      replyCount: replyCount
-    };
-  } else if (ageHours < 24 && replyCount >= 100 && replyCount < 1000) {
-    opportunity = {
-      type: 'viral',
-      urgency: 'medium',
-      message: `📈 Viral thread — ${Math.round(ageHours)}h old, ${replyCount} replies`,
-      ageMinutes: Math.round(ageMinutes),
-      replyCount: replyCount
-    };
-  }
-  
-  if (opportunity) {
-    processedTweets.add(tweetId);
-    // Clean up old processed tweets (keep last 1000)
-    if (processedTweets.size > 1000) {
-      const array = Array.from(processedTweets);
-      processedTweets.clear();
-      array.slice(-500).forEach(id => processedTweets.add(id));
-    }
-  }
-  
-  return opportunity;
-}
-
-// Register early reply opportunity
-function registerEarlyReplyOpportunity(container, opportunity) {
-  // Generate stable tweet ID
-  let tweetId = null;
-  const tweetLink = container.querySelector('a[href*="/status/"]');
-  if (tweetLink) {
-    const href = tweetLink.getAttribute('href');
-    const match = href.match(/\/status\/(\d+)/);
-    if (match) {
-      tweetId = match[1];
-    }
-  }
-  
-  if (!tweetId) {
-    tweetId = container.getAttribute('data-testid') || 
-              container.querySelector('article')?.getAttribute('data-testid') ||
-              `tweet-${Date.now()}-${Math.random()}`;
-  }
-  
-  // Get tweet text and username
-  const contentSelector = '[data-testid="tweetText"], article div[lang]';
-  const contentElement = container.querySelector(contentSelector);
-  const tweetText = contentElement ? (contentElement.textContent || '').trim() : '';
-  
-  // Try to get username
-  const userLink = container.querySelector('a[href^="/"][role="link"]');
-  let username = 'Unknown';
-  if (userLink) {
-    const href = userLink.getAttribute('href');
-    if (href && href.startsWith('/') && !href.includes('/status/')) {
-      username = href.replace('/', '@');
-    } else {
-      const userText = userLink.textContent?.trim();
-      if (userText) {
-        username = userText.startsWith('@') ? userText : `@${userText}`;
-      }
-    }
-  }
-  
-  // Store opportunity
-  earlyReplyOpportunities.set(tweetId, {
-    container,
-    opportunity,
-    tweetText: tweetText, // Full text for quick reply
-    tweetTextPreview: tweetText.substring(0, 100) + (tweetText.length > 100 ? '...' : ''), // Preview for display
-    username,
-    tweetId,
-    timestamp: Date.now()
-  });
-  
-  // Show browser notification for high urgency opportunities
-  if (opportunity.urgency === 'high') {
-    showBrowserNotification(opportunity.message, tweetText.substring(0, 50));
-  }
-}
-
-// Handle quick reply from sidebar
-async function handleQuickReply(container, tweetText, button) {
-  if (!apiKey || !tweetText) {
-    return;
-  }
-  if (containerGenerationLocks.get(container)) return;
-  containerGenerationLocks.set(container, true);
-  
-  const originalText = button.textContent;
-  button.disabled = true;
-  button.textContent = '⏳ Generating...';
-  
-  try {
-    // Analyze tweet and get best style
-    const suggestions = await analyzeTweetAndSuggestStyles(tweetText);
-    const bestStyle = suggestions && suggestions.length > 0 ? suggestions[0] : 'friendly';
-    
-    // Generate comment
-    const comment = await generateComment(tweetText, bestStyle, {
-      onRateLimitStatus: ({ phase, queuePosition, remainingMs }) => {
-        if (phase === 'waiting') {
-          const remainingSeconds = Math.max(1, Math.ceil((remainingMs || 0) / 1000));
-          button.textContent = `⏳ Queue #${queuePosition} · ${remainingSeconds}s`;
-        } else if (phase === 'ready') {
-          button.textContent = '⏳ Generating...';
-        }
-      }
-    });
-    
-    // Scroll to tweet first
-    scrollToTweet(container, null);
-    
-    // Wait a bit for scroll
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Click reply button
-    const replyButton = container.querySelector('[data-testid="reply"], [aria-label*="Reply"], [aria-label*="reply"]');
-    if (replyButton) {
-      replyButton.click();
-      
-      // Wait and insert comment
-      setTimeout(async () => {
-        try {
-          await insertIntoTwitter(null, comment);
-          
-          // Increment and update generation count
-          incrementGenerationCount();
-          
-          button.textContent = '✓ Done!';
-          button.style.background = '#16a34a';
-          setTimeout(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-            button.style.background = '';
-            containerGenerationLocks.set(container, false);
-          }, 2000);
-        } catch (error) {
-          console.error('tonegenie: Error inserting quick reply:', error);
-          button.textContent = 'Retry';
-          button.disabled = false;
-          containerGenerationLocks.set(container, false);
-        }
-      }, 500);
-    } else {
-      button.textContent = 'Tweet not found';
-      button.disabled = false;
-      containerGenerationLocks.set(container, false);
-    }
-  } catch (error) {
-    console.error('tonegenie: Error generating quick reply:', error);
-    button.textContent = 'Error';
-    button.disabled = false;
-    containerGenerationLocks.set(container, false);
-  }
-}
-
-// Scroll to tweet
-function scrollToTweet(container, tweetId) {
-  if (!container || !document.contains(container)) {
-    // Try to find container by tweet ID
-    const tweetLink = document.querySelector(`a[href*="/status/${tweetId}"]`);
-    if (tweetLink) {
-      const newContainer = tweetLink.closest('article[data-testid="tweet"], article[role="article"]');
-      if (newContainer) {
-        newContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Highlight briefly
-        newContainer.style.transition = 'box-shadow 0.3s';
-        newContainer.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.5)';
-        setTimeout(() => {
-          newContainer.style.boxShadow = '';
-        }, 2000);
-        return;
-      }
-    }
-    console.log('tonegenie: Could not find tweet container');
-    return;
-  }
-  
-  container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  
-  // Highlight briefly
-  container.style.transition = 'box-shadow 0.3s';
-  container.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.5)';
-  setTimeout(() => {
-    container.style.boxShadow = '';
-  }, 2000);
-}
-
-// Show browser notification
-function showBrowserNotification(title, body) {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification(title, {
-      body: body,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23667eea"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-      tag: 'tonegenie-early-reply'
-    });
-  } else if ('Notification' in window && Notification.permission !== 'denied') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        showBrowserNotification(title, body);
-      }
-    });
-  }
-}
-
 // ==================== HELPER FUNCTIONS ====================
 
 // Manual test function
@@ -2699,5 +2313,3 @@ window.testTonegenie = function() {
     console.error('tonegenie: No API key found! Please set it in the extension popup.');
   }
 };
-
-

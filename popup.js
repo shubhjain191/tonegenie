@@ -1,5 +1,3 @@
-let usageRefreshInterval = null;
-
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -47,56 +45,6 @@ function setupSecretFieldControls(inputId, toggleId, copyId, fieldName) {
   });
 }
 
-function formatUsageDateKey(dateInput = new Date()) {
-  const date = new Date(dateInput);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatDuration(ms) {
-  const totalSeconds = Math.floor((ms || 0) / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
-function sumLastNDays(usage, days, includeToday = true) {
-  let total = 0;
-  const startOffset = includeToday ? 0 : 1;
-  for (let i = startOffset; i < days + startOffset; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const key = formatUsageDateKey(date);
-    total += usage[key] || 0;
-  }
-  return total;
-}
-
-async function refreshUsageSummaryDisplay() {
-  const data = await chrome.storage.local.get(['xDailyUsageMs']);
-  const usage = data.xDailyUsageMs || {};
-  const yesterdayDate = new Date();
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayKey = formatUsageDateKey(yesterdayDate);
-
-  const yesterdayMs = usage[yesterdayKey] || 0;
-  const last7DaysMs = sumLastNDays(usage, 7, true);
-  const last30DaysMs = sumLastNDays(usage, 30, true);
-
-  const yesterdayEl = document.getElementById('yesterdayUsageTime');
-  const last7El = document.getElementById('last7DaysUsageTime');
-  const last30El = document.getElementById('last30DaysUsageTime');
-
-  if (yesterdayEl) yesterdayEl.textContent = `Yesterday: ${formatDuration(yesterdayMs)}`;
-  if (last7El) last7El.textContent = `Last 7 days: ${formatDuration(last7DaysMs)}`;
-  if (last30El) last30El.textContent = `Last 30 days: ${formatDuration(last30DaysMs)}`;
-}
-
 async function notifyTwitterTabs(action = 'apiKeyUpdated') {
   const tabs = await chrome.tabs.query({ url: ['*://twitter.com/*', '*://x.com/*'] });
   for (const tab of tabs) {
@@ -118,13 +66,6 @@ async function initializePopup() {
 
   if (stored.apiKey) document.getElementById('apiKey').value = stored.apiKey;
   if (stored.openRouterKey) document.getElementById('openRouterKey').value = stored.openRouterKey;
-
-
-  await refreshUsageSummaryDisplay();
-  if (usageRefreshInterval) {
-    clearInterval(usageRefreshInterval);
-  }
-  usageRefreshInterval = setInterval(refreshUsageSummaryDisplay, 30000);
 }
 
 
@@ -175,10 +116,4 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
 initializePopup().catch(() => {
   showStatus('Could not initialize popup settings.', 'error');
-});
-
-window.addEventListener('beforeunload', () => {
-  if (usageRefreshInterval) {
-    clearInterval(usageRefreshInterval);
-  }
 });
